@@ -1,0 +1,63 @@
+name: obdreader2
+description: "ÓE-BD2 – OBD-II diagnosztika"
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.5.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+  flutter_bluetooth_serial: ^0.4.0
+  flutter_blue_plus: ^1.14.0
+  # obd2_plugin:
+  #   git:
+  #     url: https://github.com/begaz/OBDII.git
+  #     ref: main
+  permission_handler: ^11.4.0
+  provider: ^6.0.5
+  fl_chart: ^0.66.2
+
+  # ── Drift (your ORM) ──────────────────────────────────
+  drift: ^2.9.0
+  sqlite3_flutter_libs: ^0.5.5
+  sqflite: ^2.0.0+4
+  path: any
+  path_provider: any
+  shared_preferences: ^2.2.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.14.3
+  flutter_native_splash: ^2.2.15
+
+  # DB tooling for Drift
+  drift_dev: ^2.9.0
+  build_runner: ^2.4.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/bluetooth_connected.png
+    - assets/icon/app_icon.png
+    - assets/splash.png
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icon/app_icon.png"
+  remove_alpha_ios: true
+  min_sdk_android: 21
+
+flutter_native_splash:
+  color: "#ffffff"
+  image: assets/splash.png
+  android: true
+  ios: true
