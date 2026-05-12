@@ -1,9 +1,3 @@
-// lib/services/ble_obd_connection.dart
-//
-// BLE ELM327 kapcsolat.
-// Szekvenciális request-response: sendAndWait elküldi a parancsot
-// és megvárja a teljes választ (a '>' prompt-ig).
-
 import 'dart:async';
 
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
@@ -22,7 +16,6 @@ class BleObdConnection implements ObdConnection {
 
   BleObdConnection._(this._device);
 
-  /// Kapcsolódás és inicializálás.
   static Future<BleObdConnection> connect(BluetoothDevice device) async {
     final conn = BleObdConnection._(device);
     await conn._init();
@@ -30,16 +23,17 @@ class BleObdConnection implements ObdConnection {
   }
 
   Future<void> _init() async {
-    await _device.connect(timeout: const Duration(seconds: 15));
+    await _device.connect(license: License.free, timeout: const Duration(seconds: 15));
     _connected = true;
 
     _stateSub = _device.connectionState.listen((state) {
       if (state == BluetoothConnectionState.disconnected) {
         _connected = false;
-        if (_pending != null && !_pending!.isCompleted) {
-          _pending!.completeError(StateError('BLE connection lost'));
-        }
+        final p = _pending;
         _pending = null;
+        if (p != null && !p.isCompleted) {
+          p.completeError(StateError('BLE connection lost'));
+        }
       }
     });
 
@@ -87,9 +81,10 @@ class BleObdConnection implements ObdConnection {
       _buf.write(s.substring(idx + 1));
     }
 
-    if (_pending != null && !_pending!.isCompleted) {
-      _pending!.complete(response);
-      _pending = null;
+    final p = _pending;
+    _pending = null;
+    if (p != null && !p.isCompleted) {
+      p.complete(response);
     }
   }
 
@@ -100,29 +95,42 @@ class BleObdConnection implements ObdConnection {
       }) async {
     if (!_connected) throw StateError('Not connected');
 
-    if (_pending != null && !_pending!.isCompleted) {
-      _pending!.completeError(StateError('Overridden by new command'));
+    final prev = _pending;
+    if (prev != null && !prev.isCompleted) {
+      prev.future.ignore();
+      prev.completeError(StateError('Overridden by new command'));
     }
 
-    // Korábbi (elavult) adat törlése
     _buf.clear();
 
-    _pending = Completer<String>();
-    final future = _pending!.future;
+    final pending = Completer<String>();
+    _pending = pending;
+    final future = pending.future;
 
     if (_writeChar != null) {
-      await _writeChar!.write(
-        command.codeUnits,
-        withoutResponse: _writeChar!.properties.writeWithoutResponse,
-      );
+      try {
+        await _writeChar!.write(
+          command.codeUnits,
+          withoutResponse: _writeChar!.properties.writeWithoutResponse,
+        );
+      } catch (e) {
+        if (identical(_pending, pending)) {
+          _pending = null;
+        }
+        if (!pending.isCompleted) {
+          pending.completeError(e);
+        }
+        rethrow;
+      }
     }
 
-    // Válasz már a bufferben lehet
     _tryComplete();
 
     return future.timeout(timeout, onTimeout: () {
-      _pending = null;
-      _buf.clear();
+      if (identical(_pending, pending)) {
+        _pending = null;
+        _buf.clear();
+      }
       throw TimeoutException('No response for: ${command.trim()}', timeout);
     });
   }
@@ -141,15 +149,16 @@ class BleObdConnection implements ObdConnection {
 
   @override
   Future<void> close() async {
-    _notifySub?.cancel();
-    _stateSub?.cancel();
-    if (_pending != null && !_pending!.isCompleted) {
-      _pending!.completeError(StateError('Connection closed'));
-    }
+    _connected = false;
+    await _notifySub?.cancel();
+    await _stateSub?.cancel();
+    final p = _pending;
     _pending = null;
+    if (p != null && !p.isCompleted) {
+      p.completeError(StateError('Connection closed'));
+    }
     try {
       await _device.disconnect();
     } catch (_) {}
-    _connected = false;
   }
 }

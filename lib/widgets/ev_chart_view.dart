@@ -1,20 +1,20 @@
-// lib/widgets/ev_chart_view.dart
-//
-// Valósidős EV grafikon — fl_chart LineChart.
-// Megjeleníti az utolsó ~2 percet: Teljesítmény / Sebesség / SOC.
-
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:provider/provider.dart';
 
+import '../l10n/app_localizations.dart';
 import '../models/trip_data.dart';
+import '../services/locale_notifier.dart';
 import 'dashboard_cards.dart';
 
 enum _Metric { power, speed, soc }
 
+/// Valósidős EV vonaldiagram: teljesítmény, sebesség vagy SOC metrika váltható.
 class EvChartView extends StatefulWidget {
   final List<EvDataPoint> points;
 
-  const EvChartView({Key? key, required this.points}) : super(key: key);
+  const EvChartView({super.key, required this.points});
 
   @override
   State<EvChartView> createState() => _EvChartViewState();
@@ -23,27 +23,29 @@ class EvChartView extends StatefulWidget {
 class _EvChartViewState extends State<EvChartView> {
   _Metric _metric = _Metric.power;
 
+  AppLocalizations get _l => context.read<LocaleNotifier>().strings;
+
   @override
   Widget build(BuildContext context) {
+    final l = _l;
     return Container(
-      color: const Color(0xFF121212),
+      color: Theme.of(context).scaffoldBackgroundColor,
       child: Column(children: [
-        // ── Metrika váltó ──────────────────────────────────────────────────
         Padding(
           padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
           child: SegmentedButton<_Metric>(
-            segments: const [
+            segments: [
               ButtonSegment(
                 value: _Metric.power,
-                label: Text('Teljesítmény'),
-                icon: Icon(Icons.electric_bolt, size: 14),
+                label: Text(l.powerLabel),
+                icon: const Icon(Icons.electric_bolt, size: 14),
               ),
               ButtonSegment(
                 value: _Metric.speed,
-                label: Text('Sebesség'),
-                icon: Icon(Icons.speed, size: 14),
+                label: Text(l.speedLabel),
+                icon: const Icon(Icons.speed, size: 14),
               ),
-              ButtonSegment(
+              const ButtonSegment(
                 value: _Metric.soc,
                 label: Text('SOC'),
                 icon: Icon(Icons.battery_full, size: 14),
@@ -51,27 +53,40 @@ class _EvChartViewState extends State<EvChartView> {
             ],
             selected: {_metric},
             onSelectionChanged: (v) => setState(() => _metric = v.first),
-            style: const ButtonStyle(
+            style: ButtonStyle(
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               visualDensity: VisualDensity.compact,
+              backgroundColor: WidgetStateProperty.resolveWith<Color>((s) {
+                if (s.contains(WidgetState.selected)) return const Color(0xFF42A5F5);
+                return Theme.of(context).colorScheme.surface;
+              }),
+              foregroundColor: WidgetStateProperty.resolveWith<Color>((s) {
+                if (s.contains(WidgetState.selected)) return Colors.black;
+                return Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.65);
+              }),
+              iconColor: WidgetStateProperty.resolveWith<Color>((s) {
+                if (s.contains(WidgetState.selected)) return Colors.black;
+                return Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.45);
+              }),
+              side: WidgetStateProperty.all(
+                BorderSide(color: Theme.of(context).colorScheme.outline),
+              ),
             ),
           ),
         ),
 
-        // ── Grafikon ───────────────────────────────────────────────────────
         Expanded(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(4, 8, 16, 4),
             child: widget.points.length < 3
-                ? const Center(
-                    child: Text('Adatgyűjtés folyamatban...',
-                        style: TextStyle(color: Colors.grey, fontSize: 14)),
+                ? Center(
+                    child: Text(l.dataCollectionInProgress,
+                        style: const TextStyle(color: Colors.grey, fontSize: 14)),
                   )
                 : _buildChart(),
           ),
         ),
 
-        // ── Jelenlegi érték ────────────────────────────────────────────────
         if (widget.points.isNotEmpty) _buildCurrentCard(),
         const SizedBox(height: 8),
       ]),
@@ -79,8 +94,9 @@ class _EvChartViewState extends State<EvChartView> {
   }
 
   Widget _buildChart() {
+    final l   = _l;
     final pts = widget.points;
-    final cfg = _config();
+    final cfg = _config(l);
     final t0 = pts.first.time.millisecondsSinceEpoch / 1000.0;
 
     final spots = pts.map((p) {
@@ -101,11 +117,14 @@ class _EvChartViewState extends State<EvChartView> {
         clipData: FlClipData.all(),
         lineTouchData: LineTouchData(
           touchTooltipData: LineTouchTooltipData(
-            tooltipBgColor: const Color(0xFF2A2A2A),
+            getTooltipColor: (spot) => Theme.of(context).colorScheme.surface,
+            tooltipBorder: BorderSide(color: Theme.of(context).colorScheme.outline),
             getTooltipItems: (spots) => spots
                 .map((s) => LineTooltipItem(
                       '${s.y.toStringAsFixed(1)} ${cfg.unit}',
-                      const TextStyle(color: Colors.white, fontSize: 12),
+                      TextStyle(
+                          color: Theme.of(context).colorScheme.onSurface,
+                          fontSize: 12),
                     ))
                 .toList(),
           ),
@@ -132,7 +151,7 @@ class _EvChartViewState extends State<EvChartView> {
               showTitles: true,
               reservedSize: 40,
               getTitlesWidget: (v, meta) {
-                // Csak főbb értékeket jelenítünk meg
+                // A tengelyhatárokra nem írunk feliratot — szélükön nincs hely
                 if (v == meta.min || v == meta.max) return const SizedBox.shrink();
                 return Text(
                   v.toStringAsFixed(0),
@@ -147,11 +166,11 @@ class _EvChartViewState extends State<EvChartView> {
           show: true,
           drawVerticalLine: false,
           getDrawingHorizontalLine: (_) =>
-              FlLine(color: const Color(0xFF2A2A2A), strokeWidth: 1),
+              FlLine(color: Theme.of(context).colorScheme.outlineVariant, strokeWidth: 1),
         ),
         borderData: FlBorderData(show: false),
         lineBarsData: [
-          // Teljesítmény grafikon: nulla vonal
+          // Teljesítmény nézetben szaggatott nullavonal jelzi a REGEN / MOTOR határát
           if (_metric == _Metric.power)
             LineChartBarData(
               spots: [FlSpot(0, 0), FlSpot(maxX, 0)],
@@ -160,7 +179,7 @@ class _EvChartViewState extends State<EvChartView> {
               dotData: FlDotData(show: false),
               dashArray: [4, 4],
             ),
-          // Fő adatsor
+          // Fő adatsor (teljesítmény / sebesség / SOC)
           LineChartBarData(
             spots: spots,
             isCurved: true,
@@ -169,18 +188,18 @@ class _EvChartViewState extends State<EvChartView> {
             barWidth: 2,
             dotData: FlDotData(show: false),
             isStrokeCapRound: true,
-            // Motor terület (pozitív teljesítmény / sebesség / SOC)
+            // Kitöltés a vonal alatt (pozitív teljesítmény, sebesség, SOC)
             belowBarData: BarAreaData(
               show: true,
               color: cfg.fillColor,
               cutOffY: 0,
               applyCutOffY: _metric == _Metric.power,
             ),
-            // Rekuperáció terület (negatív teljesítmény)
+            // Kitöltés a vonal felett: csak teljesítmény nézetben, negatív (REGEN) értékekhez
             aboveBarData: _metric == _Metric.power
                 ? BarAreaData(
                     show: true,
-                    color: const Color(0xFF66BB6A).withOpacity(0.18),
+                    color: const Color(0xFF66BB6A).withValues(alpha: 0.18),
                     cutOffY: 0,
                     applyCutOffY: true,
                   )
@@ -193,8 +212,9 @@ class _EvChartViewState extends State<EvChartView> {
   }
 
   Widget _buildCurrentCard() {
+    final l   = _l;
     final last = widget.points.last;
-    final cfg = _config();
+    final cfg = _config(l);
     final val = _value(last);
     final isRegen = _metric == _Metric.power && val < -0.5;
     final valueColor = isRegen ? const Color(0xFF66BB6A) : cfg.lineColor;
@@ -250,34 +270,43 @@ class _EvChartViewState extends State<EvChartView> {
     }
   }
 
-  _ChartCfg _config() {
+  _ChartCfg _config(AppLocalizations l) {
+    final pts = widget.points;
     switch (_metric) {
       case _Metric.power:
-        return const _ChartCfg(
-          label: 'Teljesítmény',
-          unit: 'kW',
-          minY: -65,
-          maxY: 155,
-          lineColor: Color(0xFF42A5F5),
-          fillColor: Color(0x2642A5F5),
+        double minY = -20, maxY = 20;
+        if (pts.isNotEmpty) {
+          final dMin = pts.map((p) => p.power).reduce(math.min);
+          final dMax = pts.map((p) => p.power).reduce(math.max);
+            // 5 kW puffer + 10 kW-ra kerekítés, hogy a grafikon ne legyen szoros
+          minY = ((((dMin - 5) / 10).floor()) * 10.0).clamp(-70.0, -5.0);
+          maxY = ((((dMax + 5) / 10).ceil()) * 10.0).clamp(10.0, 155.0);
+        }
+        return _ChartCfg(
+          label: l.powerLabel, unit: 'kW',
+          minY: minY, maxY: maxY,
+          lineColor: const Color(0xFF42A5F5),
+          fillColor: const Color(0x2642A5F5),
         );
       case _Metric.speed:
-        return const _ChartCfg(
-          label: 'Sebesség',
-          unit: 'km/h',
-          minY: 0,
-          maxY: 160,
-          lineColor: Color(0xFFFFA726),
-          fillColor: Color(0x26FFA726),
+        double maxY = 40;
+        if (pts.isNotEmpty) {
+          final dMax = pts.map((p) => p.speed).reduce(math.max);
+          // 10 km/h puffer + 20-asra kerekítés felfelé, minimum 40 km/h
+          maxY = (((dMax + 10) / 20).ceil() * 20.0).clamp(40.0, 160.0);
+        }
+        return _ChartCfg(
+          label: l.speedLabel, unit: 'km/h',
+          minY: 0, maxY: maxY,
+          lineColor: const Color(0xFFFFA726),
+          fillColor: const Color(0x26FFA726),
         );
       case _Metric.soc:
-        return const _ChartCfg(
-          label: 'Töltöttség',
-          unit: '%',
-          minY: 0,
-          maxY: 100,
-          lineColor: Color(0xFF4CAF50),
-          fillColor: Color(0x264CAF50),
+        return _ChartCfg(
+          label: 'SOC', unit: '%',
+          minY: 0, maxY: 100,
+          lineColor: const Color(0xFF4CAF50),
+          fillColor: const Color(0x264CAF50),
         );
     }
   }

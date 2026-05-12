@@ -1,14 +1,10 @@
-// lib/widgets/dashboard_gauge.dart
-//
-// Analóg tűs műszerek OBD-II adatokhoz.
-// OBDNeedleGauge – általános (RPM, sebesség)
-// OBDPowerGauge  – EV teljesítmény (REGEN / MOTOR zónákkal)
-
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../services/locale_notifier.dart';
+import '../theme/app_theme.dart';
 
-// ── Színzóna definíció ─────────────────────────────────────────────────────
-
+/// A műszer ívének egy kiemelő zónája — értéktartomány és szín.
 class GaugeZone {
   final double from;
   final double to;
@@ -22,8 +18,7 @@ class GaugeZone {
   });
 }
 
-// ── Általános analóg tűs műszer ────────────────────────────────────────────
-
+/// Általános analóg tűs műszer — RPM, sebesség és egyéb OBD értékekhez.
 class OBDNeedleGauge extends StatelessWidget {
   final String title;
   final double value;
@@ -34,7 +29,7 @@ class OBDNeedleGauge extends StatelessWidget {
   final List<double> tickValues;
 
   const OBDNeedleGauge({
-    Key? key,
+    super.key,
     required this.title,
     required this.value,
     required this.minValue,
@@ -42,7 +37,7 @@ class OBDNeedleGauge extends StatelessWidget {
     required this.unit,
     this.zones = const [],
     this.tickValues = const [],
-  }) : super(key: key);
+  });
 
   String _fmt(double v) {
     if (v.isNaN || v.isInfinite) return '--';
@@ -60,8 +55,9 @@ class OBDNeedleGauge extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF1C1C1C),
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Theme.of(context).colorScheme.outline, width: 1),
       ),
       padding: const EdgeInsets.fromLTRB(10, 10, 10, 8),
       child: Column(
@@ -69,8 +65,8 @@ class OBDNeedleGauge extends StatelessWidget {
         children: [
           Text(
             title,
-            style: const TextStyle(
-              color: Color(0xFF9E9E9E),
+            style: TextStyle(
+              color: Theme.of(context).textTheme.bodySmall?.color ?? const Color(0xFF9E9E9E),
               fontSize: 10,
               fontWeight: FontWeight.w600,
               letterSpacing: 1.4,
@@ -86,6 +82,7 @@ class OBDNeedleGauge extends StatelessWidget {
                 maxValue: maxValue,
                 zones: zones,
                 tickValues: tickValues,
+                trackColor: AppTheme.trackColor(context),
               ),
             ),
           ),
@@ -95,8 +92,8 @@ class OBDNeedleGauge extends StatelessWidget {
               children: [
                 TextSpan(
                   text: _fmt(value),
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface,
                     fontSize: 26,
                     fontWeight: FontWeight.bold,
                     height: 1.0,
@@ -104,8 +101,9 @@ class OBDNeedleGauge extends StatelessWidget {
                 ),
                 TextSpan(
                   text: '  $unit',
-                  style: const TextStyle(
-                    color: Color(0xFF9E9E9E),
+                  style: TextStyle(
+                    color: Theme.of(context).textTheme.bodySmall?.color
+                        ?? const Color(0xFF9E9E9E),
                     fontSize: 13,
                   ),
                 ),
@@ -125,8 +123,9 @@ class _NeedleGaugePainter extends CustomPainter {
   final double maxValue;
   final List<GaugeZone> zones;
   final List<double> tickValues;
+  final Color trackColor;
 
-  // 270° ív: 135°-tól (7:30) indul, 270° CW sweepel
+  // 270°-os ív: 135°-nál (7:30 pozíció) kezdődik, óramutató járásával megegyező irányban
   static const _startDeg = 135.0;
   static const _sweepDeg = 270.0;
   static const _startRad = _startDeg * math.pi / 180.0;
@@ -138,6 +137,7 @@ class _NeedleGaugePainter extends CustomPainter {
     required this.maxValue,
     required this.zones,
     required this.tickValues,
+    required this.trackColor,
   });
 
   double _toRad(double v) {
@@ -148,22 +148,22 @@ class _NeedleGaugePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final cx = size.width / 2;
-    final cy = size.height * 0.50;
+    final cy = size.height * 0.60;
     final center = Offset(cx, cy);
-    final radius = math.min(size.width * 0.41, size.height * 0.55);
+    final radius = math.min(size.width * 0.37, size.height * 0.46);
 
-    // 1. Háttér ív
+    // 1. Háttér ív (témafüggő szín)
     canvas.drawArc(
       Rect.fromCircle(center: center, radius: radius),
       _startRad, _sweepRad, false,
       Paint()
-        ..color = const Color(0xFF3A3A3A)
+        ..color = trackColor
         ..style = PaintingStyle.stroke
         ..strokeWidth = 10
         ..strokeCap = StrokeCap.butt,
     );
 
-    // 2. Színzónák
+    // 2. Opcionális színzónák (pl. piros veszélyzóna)
     for (final z in zones) {
       final zStart = _toRad(z.from);
       final zSweep = _toRad(z.to) - zStart;
@@ -179,7 +179,7 @@ class _NeedleGaugePainter extends CustomPainter {
       );
     }
 
-    // 3. Jelölők és feliratok
+    // 3. Osztásjelek és értékfeliratok
     final tickPaint = Paint()
       ..color = const Color(0xFF606060)
       ..strokeWidth = 1.5;
@@ -208,7 +208,7 @@ class _NeedleGaugePainter extends CustomPainter {
       ));
     }
 
-    // 4. Mutató tű
+    // 4. Mutató tű és középső kör
     final pct = ((value - minValue) / (maxValue - minValue)).clamp(0.0, 1.0);
     final needleAngle = _startRad + _sweepRad * pct;
     final nl = radius - 13;
@@ -226,43 +226,46 @@ class _NeedleGaugePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_NeedleGaugePainter old) =>
-      old.value != value || old.minValue != minValue || old.maxValue != maxValue;
+      old.value != value || old.minValue != minValue ||
+      old.maxValue != maxValue || old.trackColor != trackColor;
 }
 
-// ── EV Teljesítmény műszer (REGEN / MOTOR) ─────────────────────────────────
-
+/// EV teljesítmény műszer — negatív értékek REGEN (zöld), pozitívak MOTOR (kék) zónát jelölnek.
 class OBDPowerGauge extends StatelessWidget {
   final double value; // kW, negatív = rekuperáció
   final double minValue; // pl. -60
   final double maxValue; // pl. 150
 
   const OBDPowerGauge({
-    Key? key,
+    super.key,
     required this.value,
     this.minValue = -60,
     this.maxValue = 150,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
-    final sign = value > 0 ? '+' : '';
+    final cs        = Theme.of(context).colorScheme;
+    final tt        = Theme.of(context).textTheme;
+    final sign       = value > 0 ? '+' : '';
     final valueColor = value < 0
         ? const Color(0xFF66BB6A)
-        : Colors.white;
+        : cs.onSurface;
 
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF1C1C1C),
+        color: cs.surface,
         borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: cs.outline, width: 1),
       ),
       padding: const EdgeInsets.fromLTRB(10, 10, 10, 8),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text(
-            'TELJESÍTMÉNY',
+          Text(
+            context.watch<LocaleNotifier>().strings.powerLabel.toUpperCase(),
             style: TextStyle(
-              color: Color(0xFF9E9E9E),
+              color: tt.bodySmall?.color ?? const Color(0xFF9E9E9E),
               fontSize: 10,
               fontWeight: FontWeight.w600,
               letterSpacing: 1.4,
@@ -276,6 +279,12 @@ class OBDPowerGauge extends StatelessWidget {
                 value: value,
                 minValue: minValue,
                 maxValue: maxValue,
+                regenBgColor: Theme.of(context).brightness == Brightness.dark
+                    ? const Color(0xFF1B3A1B)
+                    : Colors.green.withValues(alpha: 0.12),
+                motorBgColor: Theme.of(context).brightness == Brightness.dark
+                    ? const Color(0xFF0D1F3A)
+                    : Colors.blue.withValues(alpha: 0.10),
               ),
             ),
           ),
@@ -292,9 +301,11 @@ class OBDPowerGauge extends StatelessWidget {
                     height: 1.0,
                   ),
                 ),
-                const TextSpan(
+                TextSpan(
                   text: '  kW',
-                  style: TextStyle(color: Color(0xFF9E9E9E), fontSize: 13),
+                  style: TextStyle(
+                      color: tt.bodySmall?.color ?? const Color(0xFF9E9E9E),
+                      fontSize: 13),
                 ),
               ],
             ),
@@ -310,8 +321,10 @@ class _PowerGaugePainter extends CustomPainter {
   final double value;
   final double minValue;
   final double maxValue;
+  final Color regenBgColor;
+  final Color motorBgColor;
 
-  // startAngle=210°, sweepAngle=210° → 0kW pontosan a tetőn (270°=12 óra)
+  // 210° kezdet, 210° ív → a 0 kW pont pontosan a tetőn (270° = 12 óra) van
   static const _startRad = 210.0 * math.pi / 180.0;
   static const _sweepRad = 210.0 * math.pi / 180.0;
 
@@ -319,6 +332,8 @@ class _PowerGaugePainter extends CustomPainter {
     required this.value,
     required this.minValue,
     required this.maxValue,
+    required this.regenBgColor,
+    required this.motorBgColor,
   });
 
   double _toRad(double v) {
@@ -329,37 +344,39 @@ class _PowerGaugePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final cx = size.width / 2;
-    final cy = size.height * 0.50;
+    // Középpontot lejjebb toljuk, hogy a '0' felirat (270° = 12 óra) a canvas-on belül
+    // maradjon és ne csússzon rá a widget-cím szövegre.
+    final cy = size.height * 0.60;
     final center = Offset(cx, cy);
-    final radius = math.min(size.width * 0.41, size.height * 0.55);
+    final radius = math.min(size.width * 0.37, size.height * 0.46);
 
     final zeroAngle = _toRad(0.0);
     final regenSweep = zeroAngle - _startRad;
     final motorSweep = _sweepRad - regenSweep;
 
-    // 1. REGEN háttér (sötétzöld)
+    // 1. Rekuperáció (REGEN) zóna háttere — témafüggő
     canvas.drawArc(
       Rect.fromCircle(center: center, radius: radius),
       _startRad, regenSweep, false,
       Paint()
-        ..color = const Color(0xFF1B3A1B)
+        ..color = regenBgColor
         ..style = PaintingStyle.stroke
         ..strokeWidth = 10
         ..strokeCap = StrokeCap.butt,
     );
 
-    // 2. MOTOR háttér (sötétkék)
+    // 2. Motoros (MOTOR) zóna háttere — témafüggő
     canvas.drawArc(
       Rect.fromCircle(center: center, radius: radius),
       zeroAngle, motorSweep, false,
       Paint()
-        ..color = const Color(0xFF0D1F3A)
+        ..color = motorBgColor
         ..style = PaintingStyle.stroke
         ..strokeWidth = 10
         ..strokeCap = StrokeCap.butt,
     );
 
-    // 3. Aktív kiemelés az aktuális értékig
+    // 3. Aktív kiemelés: az aktuális értékig megvilágítja a megfelelő zónát
     if (value < 0) {
       final valAngle = _toRad(value);
       canvas.drawArc(
@@ -384,7 +401,7 @@ class _PowerGaugePainter extends CustomPainter {
       );
     }
 
-    // 4. Feliratok (REGEN, 0, MOTOR)
+    // 4. Zóna feliratok a műszer ívén kívül (REGEN, 0, MOTOR)
     final tp = TextPainter(textDirection: TextDirection.ltr);
 
     void drawLabel(String text, double angle, Color color) {
@@ -407,7 +424,7 @@ class _PowerGaugePainter extends CustomPainter {
     drawLabel('0', zeroAngle, const Color(0xFF9E9E9E));
     drawLabel('MOTOR', _startRad + _sweepRad * 0.85, const Color(0xFF64B5F6));
 
-    // 5. 0-jelölő tick
+    // 5. Nullapont osztásjel az ívön
     canvas.drawLine(
       Offset(center.dx + (radius - 2) * math.cos(zeroAngle),
           center.dy + (radius - 2) * math.sin(zeroAngle)),
@@ -416,7 +433,7 @@ class _PowerGaugePainter extends CustomPainter {
       Paint()..color = Colors.white70..strokeWidth = 2,
     );
 
-    // 6. Mutató tű
+    // 6. Mutató tű és középső kör
     final pct = ((value - minValue) / (maxValue - minValue)).clamp(0.0, 1.0);
     final needleAngle = _startRad + _sweepRad * pct;
     final nl = radius - 13;
@@ -433,5 +450,8 @@ class _PowerGaugePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_PowerGaugePainter old) => old.value != value;
+  bool shouldRepaint(_PowerGaugePainter old) =>
+      old.value != value ||
+      old.regenBgColor != regenBgColor ||
+      old.motorBgColor != motorBgColor;
 }

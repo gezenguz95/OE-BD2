@@ -1,4 +1,3 @@
-// lib/data/tables.dart
 import 'package:drift/drift.dart';
 
 class PidCatalog extends Table {
@@ -22,7 +21,7 @@ class PidValues extends Table {
 class Sessions extends Table {
   IntColumn get id => integer().autoIncrement()();
   TextColumn get name =>
-      text().withDefault(const Constant('Unnamed Session'))();
+      text().withDefault(const Constant('Névtelen menet'))();
   DateTimeColumn get startedAt => dateTime().withDefault(currentDateAndTime)();
   DateTimeColumn get endedAt => dateTime().nullable()();
 }

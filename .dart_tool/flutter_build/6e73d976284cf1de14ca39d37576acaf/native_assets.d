@@ -1,0 +1,1 @@
+ C:\\Users\\bende\\StudioProjects\\OBD2\\.dart_tool\\flutter_build\\6e73d976284cf1de14ca39d37576acaf\\native_assets.yaml: 

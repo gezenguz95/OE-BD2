@@ -1,362 +1,354 @@
-// lib/data/pid_seeds.dart
-
 import 'package:drift/drift.dart';
 import 'app_database.dart';
 
-/// A “seed” list of OBD-II Mode 01 PIDs [00..20] to populate the catalog on first run.
+/// Alapértelmezett OBD-II Mode 01 PID katalógus (00..20 + néhány gyakori 2x..5E),
+/// amit az adatbázis első indításakor töltünk be.
 final List<PidCatalogCompanion> pidSeeds = [
-  // // 00: bitmask of supported PIDs 01–20
-  // PidCatalogCompanion.insert(
-  //   mode: '01',
-  //   pid: '00',
-  //   description: 'PIDs supported [01–20]',
-  // ),
-
-  // 01: Monitor status since DTCs cleared
+  // 01: Diagnosztikai monitor állapot DTC törlés óta
   PidCatalogCompanion.insert(
     mode: '01',
     pid: '01',
-    description: 'Monitor status since DTCs cleared',
+    description: 'Monitor állapot DTC törlés óta',
   ),
 
-  // 02: Freeze DTC that caused the last freeze frame
+  // 02: Az utolsó freeze frame-et okozó DTC kód
   PidCatalogCompanion.insert(
     mode: '01',
     pid: '02',
-    description: 'Freeze DTC that caused freeze frame',
+    description: 'Freeze frame DTC',
   ),
 
-  // 03: Fuel system status
+  // 03: Üzemanyag rendszer állapota
   PidCatalogCompanion.insert(
     mode: '01',
     pid: '03',
-    description: 'Fuel system status',
+    description: 'Üzemanyag rendszer állapot',
   ),
 
-  // 04: Calculated engine load (%)
+  // 04: Számított motor terhelés (%)
   PidCatalogCompanion.insert(
     mode: '01',
     pid: '04',
-    description: 'Calculated engine load',
+    description: 'Motor terhelés',
     minValue: Value(0.0),
     maxValue: Value(100.0),
     unit: Value('%'),
   ),
 
-  // 05: Engine coolant temperature (°C)
+  // 05: Motor hűtőfolyadék hőmérséklet (°C)
   PidCatalogCompanion.insert(
     mode: '01',
     pid: '05',
-    description: 'Engine coolant temperature',
+    description: 'Hűtőfolyadék hőmérséklet',
     minValue: Value(-40.0),
     maxValue: Value(215.0),
     unit: Value('°C'),
   ),
 
-  // 06: Short term fuel trim — Bank 1 (%)
+  // 06: Rövid távú üzemanyag korrekció — 1. bank (%)
   PidCatalogCompanion.insert(
     mode: '01',
     pid: '06',
-    description: 'Short term fuel trim — Bank 1',
+    description: 'Rövid távú üzemanyag korrekció — 1. bank',
     minValue: Value(-100.0),
     maxValue: Value(99.22),
     unit: Value('%'),
   ),
 
-  // 07: Long term fuel trim — Bank 1 (%)
+  // 07: Hosszú távú üzemanyag korrekció — 1. bank (%)
   PidCatalogCompanion.insert(
     mode: '01',
     pid: '07',
-    description: 'Long term fuel trim — Bank 1',
+    description: 'Hosszú távú üzemanyag korrekció — 1. bank',
     minValue: Value(-100.0),
     maxValue: Value(99.22),
     unit: Value('%'),
   ),
 
-  // 08: Short term fuel trim — Bank 2 (%)
+  // 08: Rövid távú üzemanyag korrekció — 2. bank (%)
   PidCatalogCompanion.insert(
     mode: '01',
     pid: '08',
-    description: 'Short term fuel trim — Bank 2',
+    description: 'Rövid távú üzemanyag korrekció — 2. bank',
     minValue: Value(-100.0),
     maxValue: Value(99.22),
     unit: Value('%'),
   ),
 
-  // 09: Long term fuel trim — Bank 2 (%)
+  // 09: Hosszú távú üzemanyag korrekció — 2. bank (%)
   PidCatalogCompanion.insert(
     mode: '01',
     pid: '09',
-    description: 'Long term fuel trim — Bank 2',
+    description: 'Hosszú távú üzemanyag korrekció — 2. bank',
     minValue: Value(-100.0),
     maxValue: Value(99.22),
     unit: Value('%'),
   ),
 
-  // 0A: Fuel pressure (kPa)
+  // 0A: Üzemanyag nyomás (kPa)
   PidCatalogCompanion.insert(
     mode: '01',
     pid: '0A',
-    description: 'Fuel pressure (gauge)',
+    description: 'Üzemanyag nyomás',
     minValue: Value(0.0),
     maxValue: Value(765.0),
     unit: Value('kPa'),
   ),
 
-  // 0B: Intake manifold absolute pressure (kPa)
+  // 0B: Szívócső abszolút nyomás (kPa)
   PidCatalogCompanion.insert(
     mode: '01',
     pid: '0B',
-    description: 'Intake manifold absolute pressure',
+    description: 'Szívócső abszolút nyomás',
     minValue: Value(0.0),
     maxValue: Value(255.0),
     unit: Value('kPa'),
   ),
 
-  // 0C: Engine RPM
+  // 0C: Motor fordulatszám (rpm)
   PidCatalogCompanion.insert(
     mode: '01',
     pid: '0C',
-    description: 'Engine RPM',
+    description: 'Motor fordulatszám',
     minValue: Value(0.0),
     maxValue: Value(16383.75),
     unit: Value('rpm'),
   ),
 
-  // 0D: Vehicle speed (km/h)
+  // 0D: Jármű sebesség (km/h)
   PidCatalogCompanion.insert(
     mode: '01',
     pid: '0D',
-    description: 'Vehicle speed',
+    description: 'Jármű sebesség',
     minValue: Value(0.0),
     maxValue: Value(255.0),
     unit: Value('km/h'),
   ),
 
-  // 0E: Timing advance (° before TDC)
+  // 0E: Gyújtási előgyújtás (° BTDC)
   PidCatalogCompanion.insert(
     mode: '01',
     pid: '0E',
-    description: 'Timing advance',
+    description: 'Gyújtási előgyújtás',
     minValue: Value(-64.0),
     maxValue: Value(63.5),
     unit: Value('°'),
   ),
 
-  // 0F: Intake air temperature (°C)
+  // 0F: Beszívott levegő hőmérséklet (°C)
   PidCatalogCompanion.insert(
     mode: '01',
     pid: '0F',
-    description: 'Intake air temperature',
+    description: 'Szívott levegő hőmérséklet',
     minValue: Value(-40.0),
     maxValue: Value(215.0),
     unit: Value('°C'),
   ),
 
-  // 10: Mass air flow sensor (g/s)
+  // 10: Levegő tömegáram szenzor (g/s)
   PidCatalogCompanion.insert(
     mode: '01',
     pid: '10',
-    description: 'Mass air flow sensor',
+    description: 'Levegő tömegáram (MAF)',
     minValue: Value(0.0),
     maxValue: Value(655.35),
     unit: Value('g/s'),
   ),
 
-  // 11: Throttle position (%)
+  // 11: Fojtószelep pozíció (%)
   PidCatalogCompanion.insert(
     mode: '01',
     pid: '11',
-    description: 'Throttle position',
+    description: 'Fojtószelep pozíció',
     minValue: Value(0.0),
     maxValue: Value(100.0),
     unit: Value('%'),
   ),
 
-  // 12: Commanded secondary air status
+  // 12: Másodlagos levegő rendszer állapot
   PidCatalogCompanion.insert(
     mode: '01',
     pid: '12',
-    description: 'Commanded secondary air status',
+    description: 'Másodlagos levegő rendszer állapot',
   ),
 
-  // 13: Oxygen sensors present (in banks)
+  // 13: O₂ szenzorok bankok szerint
   PidCatalogCompanion.insert(
     mode: '01',
     pid: '13',
-    description: 'Oxygen sensors present (banks bitmap)',
+    description: 'O₂ szenzorok (bank bitmap)',
   ),
 
-  // 14: O₂ Sensor 1 — short term trim (%)
+  // 14: O₂ szenzor 1 — rövid távú korrekció (%)
   PidCatalogCompanion.insert(
     mode: '01',
     pid: '14',
-    description: 'Oxygen Sensor 1 short term trim',
+    description: 'O₂ szenzor 1 — rövid távú korrekció',
     minValue: Value(-100.0),
     maxValue: Value(99.22),
     unit: Value('%'),
   ),
 
-  // 15: O₂ Sensor 1 — long term trim (%)
+  // 15: O₂ szenzor 1 — hosszú távú korrekció (%)
   PidCatalogCompanion.insert(
     mode: '01',
     pid: '15',
-    description: 'Oxygen Sensor 1 long term trim',
+    description: 'O₂ szenzor 1 — hosszú távú korrekció',
     minValue: Value(-100.0),
     maxValue: Value(99.22),
     unit: Value('%'),
   ),
 
-  // 16: O₂ Sensor 2 — short term trim (%)
+  // 16: O₂ szenzor 2 — rövid távú korrekció (%)
   PidCatalogCompanion.insert(
     mode: '01',
     pid: '16',
-    description: 'Oxygen Sensor 2 short term trim',
+    description: 'O₂ szenzor 2 — rövid távú korrekció',
     minValue: Value(-100.0),
     maxValue: Value(99.22),
     unit: Value('%'),
   ),
 
-  // 17: O₂ Sensor 2 — long term trim (%)
+  // 17: O₂ szenzor 2 — hosszú távú korrekció (%)
   PidCatalogCompanion.insert(
     mode: '01',
     pid: '17',
-    description: 'Oxygen Sensor 2 long term trim',
+    description: 'O₂ szenzor 2 — hosszú távú korrekció',
     minValue: Value(-100.0),
     maxValue: Value(99.22),
     unit: Value('%'),
   ),
 
-  // 18: OBD standards this vehicle conforms to
+  // 18: A jármű OBD szabványai
   PidCatalogCompanion.insert(
     mode: '01',
     pid: '18',
-    description: 'OBD standards this vehicle conforms to',
+    description: 'OBD szabványok',
   ),
 
-  // 19: Oxygen sensors present (4 banks)
+  // 19: O₂ szenzorok 4 bankra
   PidCatalogCompanion.insert(
     mode: '01',
     pid: '19',
-    description: 'Oxygen sensors present (4-banks bitmap)',
+    description: 'O₂ szenzorok (4 bank bitmap)',
   ),
 
-  // 1A: Auxiliary input status
+  // 1A: Külső bemenet állapota
   PidCatalogCompanion.insert(
     mode: '01',
     pid: '1A',
-    description: 'Auxiliary input status',
+    description: 'Külső bemenet állapot',
   ),
 
-  // 1B: Run time since engine start (s)
+  // 1B: Motor üzemideje az indítás óta (s)
   PidCatalogCompanion.insert(
     mode: '01',
     pid: '1B',
-    description: 'Run time since engine start',
+    description: 'Motor üzemidő indítás óta',
     minValue: Value(0.0),
     maxValue: Value(65535.0),
     unit: Value('s'),
   ),
 
-  // 1C: PIDs supported [21–40]
+  // 1C: Támogatott PID-ek [21–40]
   PidCatalogCompanion.insert(
     mode: '01',
     pid: '1C',
-    description: 'PIDs supported [21–40]',
+    description: 'Támogatott PID-ek [21–40]',
   ),
 
-  // 1D: Distance traveled with MIL on (km)
+  // 1D: Megtett táv MIL bekapcsolva (km)
   PidCatalogCompanion.insert(
     mode: '01',
     pid: '1D',
-    description: 'Distance traveled with MIL on',
+    description: 'Megtett táv MIL bekapcsolva',
     minValue: Value(0.0),
     maxValue: Value(65535.0),
     unit: Value('km'),
   ),
 
-  // 1E: Evap system vapor pressure (Pa)
+  // 1E: Tankszellőzés gőznyomás (Pa)
   PidCatalogCompanion.insert(
     mode: '01',
     pid: '1E',
-    description: 'Evap system vapor pressure',
+    description: 'Tankszellőzés gőznyomás',
     minValue: Value(-32768.0),
     maxValue: Value(32767.0),
     unit: Value('Pa'),
   ),
 
-  // 1F: Time since trouble codes cleared (min)
+  // 1F: Hibakód törlés óta eltelt idő (perc)
   PidCatalogCompanion.insert(
     mode: '01',
     pid: '1F',
-    description: 'Time since trouble codes cleared',
+    description: 'Idő DTC törlés óta',
     minValue: Value(0.0),
     maxValue: Value(65535.0),
     unit: Value('min'),
   ),
 
-  // 20: PIDs supported [41–60]
+  // 20: Támogatott PID-ek [41–60]
   PidCatalogCompanion.insert(
     mode: '01',
     pid: '20',
-    description: 'PIDs supported [41–60]',
+    description: 'Támogatott PID-ek [41–60]',
   ),
 
-  // 2F: Fuel Tank Level Input (%)
+  // 2F: Üzemanyagszint (%)
   PidCatalogCompanion.insert(
     mode: '01',
     pid: '2F',
-    description: 'Fuel Tank Level Input',
+    description: 'Üzemanyagszint',
     minValue: Value(0.0),
     maxValue: Value(100.0),
     unit: Value('%'),
   ),
 
-  // 33: Absolute Barometric Pressure (kPa)
+  // 33: Légköri abszolút nyomás (kPa)
   PidCatalogCompanion.insert(
     mode: '01',
     pid: '33',
-    description: 'Absolute Barometric Pressure',
+    description: 'Légköri abszolút nyomás',
     minValue: Value(0.0),
     maxValue: Value(255.0),
     unit: Value('kPa'),
   ),
 
-  // 42: Control Module Voltage (V)
+  // 42: Vezérlőegység tápfeszültség (V)
   PidCatalogCompanion.insert(
     mode: '01',
     pid: '42',
-    description: 'Control Module Voltage',
+    description: 'Vezérlőegység tápfeszültség',
     minValue: Value(0.0),
     maxValue: Value(20.0),
     unit: Value('V'),
   ),
 
-  // 46: Ambient Air Temperature (°C)
+  // 46: Külső levegő hőmérséklet (°C)
   PidCatalogCompanion.insert(
     mode: '01',
     pid: '46',
-    description: 'Ambient Air Temperature',
+    description: 'Külső levegő hőmérséklet',
     minValue: Value(-40.0),
     maxValue: Value(215.0),
     unit: Value('°C'),
   ),
 
-  // 5B: Hybrid Battery Pack Remaining Life (%)
+  // 5B: Hibrid akku hátralévő élettartam (%)
   PidCatalogCompanion.insert(
     mode: '01',
     pid: '5B',
-    description: 'Hybrid Battery Pack Remaining Life',
+    description: 'Hibrid akku hátralévő élettartam',
     minValue: Value(0.0),
     maxValue: Value(100.0),
     unit: Value('%'),
   ),
 
-  // 5E: Engine Fuel Rate (L/h)
+  // 5E: Pillanatnyi üzemanyag fogyasztás (L/h)
   PidCatalogCompanion.insert(
     mode: '01',
     pid: '5E',
-    description: 'Engine Fuel Rate',
+    description: 'Pillanatnyi üzemanyag fogyasztás',
     minValue: Value(0.0),
     maxValue: Value(3212.75),
     unit: Value('L/h'),

@@ -1,11 +1,10 @@
-// lib/services/trip_storage.dart
-//
-// JSON fájl alapú menetnapló perzisztencia.
-// Helye: {ApplicationDocumentsDirectory}/obd_trips.json
+// Menetnapló mentése — JSON fájl az alkalmazás dokumentumkönyvtárában.
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../models/trip_data.dart';
@@ -13,12 +12,13 @@ import '../models/trip_data.dart';
 class TripStorage {
   static const _fileName = 'obd_trips.json';
 
+  static Future<void> _writeChain = Future.value();
+
   static Future<File> _file() async {
     final dir = await getApplicationDocumentsDirectory();
     return File('${dir.path}/$_fileName');
   }
 
-  /// Visszaad minden mentett menetet, legfrissebb elöl.
   static Future<List<TripRecord>> loadAll() async {
     try {
       final f = await _file();
@@ -29,44 +29,74 @@ class TripStorage {
       return list
           .map((e) => TripRecord.fromJson(e as Map<String, dynamic>))
           .toList();
-    } catch (_) {
+    } catch (e) {
+      // Sérült JSON vagy I/O hiba: üres listával tér vissza, hogy az app
+      // ne crasheljen, de a hiba nyomon követhető a debug log-ban.
+      debugPrint('TripStorage.loadAll error: $e');
       return [];
     }
   }
 
-  /// Ment vagy frissít egy menetet (id alapján).
-  static Future<void> save(TripRecord trip) async {
-    try {
-      final trips = await loadAll();
-      final idx = trips.indexWhere((t) => t.id == trip.id);
-      if (idx >= 0) {
-        trips[idx] = trip;
-      } else {
-        trips.add(trip);
+  static Future<T> _enqueue<T>(Future<T> Function() op) {
+    final completer = Completer<T>();
+    _writeChain = _writeChain.then((_) async {
+      try {
+        completer.complete(await op());
+      } catch (e, st) {
+        completer.completeError(e, st);
       }
-      trips.sort((a, b) => b.startedAt.compareTo(a.startedAt));
-      final f = await _file();
-      await f.writeAsString(
-          jsonEncode(trips.map((t) => t.toJson()).toList()));
-    } catch (_) {}
+    });
+    return completer.future;
   }
 
-  /// Töröl egy menetet id alapján.
-  static Future<void> delete(String id) async {
-    try {
-      final trips = await loadAll();
-      trips.removeWhere((t) => t.id == id);
-      final f = await _file();
-      await f.writeAsString(
-          jsonEncode(trips.map((t) => t.toJson()).toList()));
-    } catch (_) {}
+  static Future<void> _atomicWriteJson(File f, String json) async {
+    final tmp = File('${f.path}.tmp');
+    await tmp.writeAsString(json, flush: true);
+    await tmp.rename(f.path);
   }
 
-  /// Törli az összes menetet.
-  static Future<void> deleteAll() async {
-    try {
-      final f = await _file();
-      if (await f.exists()) await f.writeAsString('[]');
-    } catch (_) {}
+  static Future<void> save(TripRecord trip) {
+    return _enqueue(() async {
+      try {
+        final trips = await loadAll();
+        final idx = trips.indexWhere((t) => t.id == trip.id);
+        if (idx >= 0) {
+          trips[idx] = trip;
+        } else {
+          trips.add(trip);
+        }
+        trips.sort((a, b) => b.startedAt.compareTo(a.startedAt));
+        final f = await _file();
+        final json = jsonEncode(trips.map((t) => t.toJson()).toList());
+        await _atomicWriteJson(f, json);
+      } catch (e) {
+        debugPrint('TripStorage.save error: $e');
+      }
+    });
+  }
+
+  static Future<void> delete(String id) {
+    return _enqueue(() async {
+      try {
+        final trips = await loadAll();
+        trips.removeWhere((t) => t.id == id);
+        final f = await _file();
+        final json = jsonEncode(trips.map((t) => t.toJson()).toList());
+        await _atomicWriteJson(f, json);
+      } catch (e) {
+        debugPrint('TripStorage.delete error: $e');
+      }
+    });
+  }
+
+  static Future<void> deleteAll() {
+    return _enqueue(() async {
+      try {
+        final f = await _file();
+        await _atomicWriteJson(f, '[]');
+      } catch (e) {
+        debugPrint('TripStorage.deleteAll error: $e');
+      }
+    });
   }
 }

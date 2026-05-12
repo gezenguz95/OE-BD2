@@ -1,14 +1,11 @@
-// lib/utils/obd_parser.dart
 //
-// MODULE: ELM327 Response Parser
-// PURPOSE:
-// Parses raw hexadecimal strings from the OBD adapter into human-readable values.
-// Handles Mode 01 PIDs for both standard internal combustion and EV data.
+// ELM327 nyers hex válaszok feldolgozása OBD-II PID értékekké.
+// Mode 01 PID-eket kezeli: belső égésű és EV szenzoradatok.
 
 import 'file_logger.dart';
 
 class ObdParser {
-  /// Cleans raw ELM327 data: strips '>', newlines, and normalizes whitespace.
+  /// Megtisztítja a nyers ELM327 választ: eltávolítja a '>' promptot, sortöréseket, és normalizálja a szóközöket.
   static String filterResponse(String raw) {
     if (raw.isEmpty) return '';
     String s = raw
@@ -26,8 +23,8 @@ class ObdParser {
     return upper == 'NO DATA' || upper.contains('NO DATA');
   }
 
-  /// Normalizes cleaned string to a list of hex byte strings (2 chars each).
-  /// Handles both "41 0C 1A F8" and "410C1AF8".
+  /// Szétbontja a megtisztított stringet 2 karakteres hex byte listává.
+  /// Kezeli a szóközzel elválasztott ("41 0C 1A F8") és összefűzött ("410C1AF8") formátumot is.
   static List<String> _toHexBytes(String cleaned) {
     final parts = cleaned.split(RegExp(r'\s+'));
     final result = <String>[];
@@ -45,8 +42,8 @@ class ObdParser {
     return result;
   }
 
-  /// Finds the start index of Mode 01 response (41 + pid) in the byte list.
-  /// Returns the index of the first data byte after the header, or -1.
+  /// Megkeresi a Mode 01 válasz (41 + PID) pozícióját a byte listában.
+  /// Visszatér a fejléc utáni első adatbyte indexével, vagy -1-gyel, ha nem találja.
   static int _findMode01DataStart(List<String> bytes, String pid) {
     final pidUpper = pid.toUpperCase();
     for (int i = 0; i < bytes.length - 1; i++) {
@@ -58,25 +55,25 @@ class ObdParser {
     return -1;
   }
 
-  /// Parses OBD-II RPM response (PID 0C). Expects Mode 01 response 41 0C A B.
+  /// Fordulatsszám (PID 0C) feldolgozása. Várja a "41 0C A B" Mode 01 választ.
   static String parseRPM(String data) {
     return parseGeneric(data, '0C');
   }
 
-  /// Parses OBD-II Speed response (PID 0D). Expects Mode 01 response 41 0D A.
+  /// Sebesség (PID 0D) feldolgozása. Várja a "41 0D A" Mode 01 választ.
   static String parseSpeed(String data) {
     return parseGeneric(data, '0D');
   }
 
-  /// Normalizes PID to 2-char uppercase (e.g. "05", "0C").
+  /// PID-et 2 karakteres nagybetűs formára hozza (pl. "05", "0C").
   static String _normalizePid(String pid) {
     final p = pid.replaceAll(RegExp(r'[^0-9A-Fa-f]'), '');
     if (p.length >= 2) return p.substring(p.length - 2).toUpperCase();
     return p.padLeft(2, '0').toUpperCase();
   }
 
-  /// Generic parser for Mode 01 PIDs. [pid] is the 2-char PID (e.g. "05", "0C").
-  /// Unknown PIDs return raw hex bytes for debugging.
+  /// Általános Mode 01 PID feldolgozó. [pid]: 2 karakteres PID (pl. "05", "0C").
+  /// Ismeretlen PID esetén a nyers hex byte-okat adja vissza hibakereséshez.
   static String parseGeneric(String data, String pid) {
     final cleaned = filterResponse(data);
     if (_isEmptyOrNoData(cleaned)) return '--';

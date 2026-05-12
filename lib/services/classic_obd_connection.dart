@@ -1,9 +1,3 @@
-// lib/services/classic_obd_connection.dart
-//
-// Classic Bluetooth (SPP/soros) ELM327 kapcsolat.
-// Szekvenciális request-response: sendAndWait elküldi a parancsot
-// és megvárja a teljes választ (a '>' prompt-ig).
-
 import 'dart:async';
 import 'dart:typed_data';
 
@@ -27,22 +21,22 @@ class ClassicObdConnection implements ObdConnection {
       },
       onDone: () {
         _closed = true;
-        if (_pending != null && !_pending!.isCompleted) {
-          _pending!.completeError(
-              StateError('Bluetooth connection closed'));
-        }
+        final p = _pending;
         _pending = null;
+        if (p != null && !p.isCompleted) {
+          p.completeError(StateError('Bluetooth connection closed'));
+        }
       },
       onError: (e) {
-        if (_pending != null && !_pending!.isCompleted) {
-          _pending!.completeError(e);
-        }
+        final p = _pending;
         _pending = null;
+        if (p != null && !p.isCompleted) {
+          p.completeError(e);
+        }
       },
     );
   }
 
-  /// Megkeresi a '>' prompt-ot a bufferben és lezárja a várakozó Completer-t.
   void _tryComplete() {
     final s = _buf.toString();
     final idx = s.indexOf('>');
@@ -54,9 +48,10 @@ class ClassicObdConnection implements ObdConnection {
       _buf.write(s.substring(idx + 1));
     }
 
-    if (_pending != null && !_pending!.isCompleted) {
-      _pending!.complete(response);
-      _pending = null;
+    final p = _pending;
+    _pending = null;
+    if (p != null && !p.isCompleted) {
+      p.complete(response);
     }
   }
 
@@ -67,27 +62,38 @@ class ClassicObdConnection implements ObdConnection {
       }) async {
     if (_closed) throw StateError('Connection closed');
 
-    // Előző várakozás eldobása
-    if (_pending != null && !_pending!.isCompleted) {
-      _pending!.completeError(StateError('Overridden by new command'));
+    final prev = _pending;
+    if (prev != null && !prev.isCompleted) {
+      prev.future.ignore();
+      prev.completeError(StateError('Overridden by new command'));
     }
 
-    // Korábbi (elavult) adat törlése – ne zavarjon bele az új válaszba
     _buf.clear();
 
-    _pending = Completer<String>();
-    final future = _pending!.future;
+    final pending = Completer<String>();
+    _pending = pending;
+    final future = pending.future;
 
-    // Parancs küldése
-    _conn.output.add(Uint8List.fromList(command.codeUnits));
-    await _conn.output.allSent;
+    try {
+      _conn.output.add(Uint8List.fromList(command.codeUnits));
+      await _conn.output.allSent;
+    } catch (e) {
+      if (identical(_pending, pending)) {
+        _pending = null;
+      }
+      if (!pending.isCompleted) {
+        pending.completeError(e);
+      }
+      rethrow;
+    }
 
-    // Lehet, hogy a válasz már a bufferben van (gyors adapter)
     _tryComplete();
 
     return future.timeout(timeout, onTimeout: () {
-      _pending = null;
-      _buf.clear();
+      if (identical(_pending, pending)) {
+        _pending = null;
+        _buf.clear();
+      }
       throw TimeoutException('No response for: ${command.trim()}', timeout);
     });
   }
@@ -105,11 +111,12 @@ class ClassicObdConnection implements ObdConnection {
   @override
   Future<void> close() async {
     _closed = true;
-    _sub?.cancel();
-    if (_pending != null && !_pending!.isCompleted) {
-      _pending!.completeError(StateError('Connection closed'));
-    }
+    await _sub?.cancel();
+    final p = _pending;
     _pending = null;
+    if (p != null && !p.isCompleted) {
+      p.completeError(StateError('Connection closed'));
+    }
     try { await _conn.close(); } catch (_) {}
   }
 }

@@ -1,36 +1,76 @@
-// lib/widgets/charging_monitor_view.dart
-//
-// Töltési monitor nézet – automatikusan megjelenik, ha töltési áram detektálható.
-// Mutatja: töltési teljesítmény, SOC progress, hozzáadott kWh,
-//          idő-100%-ig becslés, hőmérséklet, feszültség/áram.
+// Töltési monitor nézet — töltési áram detektálásakor automatikusan megjelenik.
+// Adatok: töltési teljesítmény, SOC sáv, session-ben hozzáadott energia,
+//         100%-ig becsült idő, hőmérséklet, feszültség/áram részletek,
+//         és SOC-alapú töltési görbe (kW és hőmérséklet nézettel).
 
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
-class ChargingMonitorView extends StatelessWidget {
-  /// Ugyanaz a _currentValues map, amit az OBD polling frissít.
+import '../models/charge_data.dart';
+import '../services/locale_notifier.dart';
+import 'charge_chart_view.dart';
+
+/// EV töltési folyamatot megjelenítő widget — a töltési session adatait mutatja.
+class ChargingMonitorView extends StatefulWidget {
+  /// Az OBD polling által folyamatosan frissített szenzorértékek.
   final Map<String, String> data;
 
-  /// Mennyit töltöttünk ebben a session-ben (kWh) – obd_data_page számolja.
+  /// A session során hozzáadott energia kWh-ban; az obd_data_page számolja.
   final double chargedKwh;
 
-  /// Mikor kezdődött a töltés.
+  /// A töltés kezdetének időpontja, az eltelt idő megjelenítéséhez.
   final DateTime? chargeStartTime;
 
+  /// Az aktuális session töltési görbéjének adatpontjai (SOC, kW, °C).
+  /// Üres lista = töltési adatok még gyűjtés alatt.
+  final List<ChargeDataPoint> chargePoints;
+
+  /// A jármű névleges akkumulátor kapacitása (kWh) — fallback, ha a
+  /// SOC-alapú számítás nem működik (alacsony SOC, hiányzó remaining_kwh).
+  /// 0 vagy negatív → 28 kWh-ra esik vissza (régi BEV alapérték).
+  final double nominalCapacityKwh;
+
   const ChargingMonitorView({
-    Key? key,
+    super.key,
     required this.data,
     required this.chargedKwh,
     this.chargeStartTime,
-  }) : super(key: key);
+    this.chargePoints = const [],
+    this.nominalCapacityKwh = 0,
+  });
+
+  @override
+  State<ChargingMonitorView> createState() => _ChargingMonitorViewState();
+}
+
+class _ChargingMonitorViewState extends State<ChargingMonitorView> {
+  Timer? _ticker;
+
+  @override
+  void initState() {
+    super.initState();
+    // 30 másodpercenként kényszerítjük az újraépítést az "Eltelt idő" mező
+    // frissítéséhez — a szülő setState-jére nem hagyatkozhatunk.
+    _ticker = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _ticker?.cancel();
+    super.dispose();
+  }
 
   double _d(String key) {
-    final s = data[key];
+    final s = widget.data[key];
     if (s == null || s == '--') return 0;
     return double.tryParse(s) ?? 0;
   }
 
   String _s(String key, [String fallback = '--']) {
-    final v = data[key];
+    final v = widget.data[key];
     return (v == null || v == '--') ? fallback : v;
   }
 
@@ -42,36 +82,42 @@ class ChargingMonitorView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n    = context.read<LocaleNotifier>().strings;
     final soc      = _d('soc_display');
     final socBms   = _d('soc_bms');
     final voltage  = _d('battery_voltage');
-    final current  = _d('battery_current'); // negatív = tölt
+    final current  = _d('battery_current'); // negatív érték = töltési állapot
     final tempMax  = _d('battery_temp_max');
     final tempMin  = _d('battery_temp_min');
     final auxBatt  = _d('aux_battery_voltage');
 
-    // Töltési teljesítmény (W → kW)
+    // Töltési teljesítmény: feszültség × |áram| / 1000, ha mindkettő érvényes.
     final chargePower = voltage > 0 && current < 0
         ? (voltage * current.abs() / 1000.0)
         : 0.0;
 
-    // SOC-alapú hatékonyság: kb 28 kWh kapacitás, 95% hatásfok
+    // SOC-alapú kapacitásbecslés: SOC < 5% körül a remaining_kwh/SOC arány
+    // zajos (cellabalancing, feszültség-offset) → fallback a járműprofil
+    // névleges akku-kapacitására (Kuga PHEV: ~14.4 kWh, Ioniq EV: ~28 kWh).
     final remainingKwh = _d('remaining_kwh');
-    final capacity = remainingKwh > 0 && soc > 0
-        ? (remainingKwh / soc * 100)
+    final fallbackCap = widget.nominalCapacityKwh > 0
+        ? widget.nominalCapacityKwh
         : 28.0;
+    final capacity = (remainingKwh > 0 && soc > 5)
+        ? (remainingKwh / soc * 100)
+        : fallbackCap;
     final toFullKwh = capacity - remainingKwh;
 
-    // Idő 100%-ig becslés
+    // 100%-ig szükséges idő becslése a jelenlegi töltési teljesítmény alapján.
     String timeToFull = '--';
     if (chargePower > 0.5 && toFullKwh > 0) {
       final hours = toFullKwh / chargePower;
       timeToFull = _fmtDuration(Duration(minutes: (hours * 60).round()));
     }
 
-    // Eltelt töltési idő
-    final elapsed = chargeStartTime != null
-        ? DateTime.now().difference(chargeStartTime!)
+    // Eltelt idő; a Timer.periodic 30 másodpercenként gondoskodik a frissítésről.
+    final elapsed = widget.chargeStartTime != null
+        ? DateTime.now().difference(widget.chargeStartTime!)
         : Duration.zero;
 
     final green = Colors.green.shade400;
@@ -82,13 +128,12 @@ class ChargingMonitorView extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // ── Fejléc ────────────────────────────────────────────────────
           Row(
             children: [
               Icon(Icons.electric_bolt, color: green, size: 22),
               const SizedBox(width: 8),
               Text(
-                'Töltés folyamatban',
+                l10n.chargingInProgress,
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -96,25 +141,23 @@ class ChargingMonitorView extends StatelessWidget {
                 ),
               ),
               const Spacer(),
-              if (chargeStartTime != null)
+              if (widget.chargeStartTime != null)
                 Text(
-                  'Eltelt: ${_fmtDuration(elapsed)}',
+                  '${l10n.elapsedPrefix}: ${_fmtDuration(elapsed)}',
                   style: TextStyle(fontSize: 13, color: Colors.grey[600]),
                 ),
             ],
           ),
           const SizedBox(height: 16),
 
-          // ── SOC sáv ───────────────────────────────────────────────────
-          _SocBar(soc: soc, socBms: socBms, color: green),
+          _SocBar(soc: soc, socBms: socBms, color: green, label: l10n.socBarTitle),
           const SizedBox(height: 20),
 
-          // ── Fő kártyák 2×2 ───────────────────────────────────────────
           Row(children: [
             Expanded(
               child: _BigCard(
                 icon: Icons.flash_on,
-                label: 'Töltési teljesítmény',
+                label: l10n.chargingPowerLabel,
                 value: chargePower > 0
                     ? chargePower.toStringAsFixed(1)
                     : '--',
@@ -126,8 +169,8 @@ class ChargingMonitorView extends StatelessWidget {
             Expanded(
               child: _BigCard(
                 icon: Icons.battery_charging_full,
-                label: 'Hozzáadott energia',
-                value: chargedKwh.toStringAsFixed(2),
+                label: l10n.energyAddedLabel,
+                value: widget.chargedKwh.toStringAsFixed(2),
                 unit: 'kWh',
                 color: teal,
               ),
@@ -138,7 +181,7 @@ class ChargingMonitorView extends StatelessWidget {
             Expanded(
               child: _BigCard(
                 icon: Icons.schedule,
-                label: 'Idő 100%-ig',
+                label: l10n.timeToFullLabel,
                 value: timeToFull,
                 unit: '',
                 color: Colors.blue.shade300,
@@ -148,7 +191,7 @@ class ChargingMonitorView extends StatelessWidget {
             Expanded(
               child: _BigCard(
                 icon: Icons.speed,
-                label: 'Töltési sebesség',
+                label: l10n.chargingSpeedLabel,
                 value: chargePower > 0 && capacity > 0
                     ? (chargePower / capacity * 100).toStringAsFixed(1)
                     : '--',
@@ -159,22 +202,22 @@ class ChargingMonitorView extends StatelessWidget {
           ]),
           const SizedBox(height: 16),
 
-          // ── Szenzor sor ───────────────────────────────────────────────
-          const Text('Töltési részletek',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+          Text(l10n.chargingDetailsLabel,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
           const SizedBox(height: 8),
-          _DetailRow(label: 'Feszültség',         value: '${_s('battery_voltage')} V'),
-          _DetailRow(label: 'Áram',               value: '${_s('battery_current')} A'),
-          _DetailRow(label: 'Akku max hőm.',      value: '${tempMax > 0 ? tempMax.toStringAsFixed(1) : '--'} °C'),
-          _DetailRow(label: 'Akku min hőm.',      value: '${tempMin > 0 ? tempMin.toStringAsFixed(1) : '--'} °C'),
+          _DetailRow(label: l10n.voltageLabel,        value: '${_s('battery_voltage')} V'),
+          _DetailRow(label: l10n.currentLabel,        value: '${_s('battery_current')} A'),
+          // A -50 sentinel értéknél nincs érvényes szenzor adat (téli állás esetén
+          // is lehet 0°C alatti az akkumulátor, ezért nem elég a <= 0 ellenőrzés).
+          _DetailRow(label: l10n.batteryMaxTempLabel, value: '${tempMax > -50 ? tempMax.toStringAsFixed(1) : '--'} °C'),
+          _DetailRow(label: l10n.batteryMinTempLabel, value: '${tempMin > -50 ? tempMin.toStringAsFixed(1) : '--'} °C'),
           if (auxBatt > 0)
-            _DetailRow(label: '12V akku',         value: '${auxBatt.toStringAsFixed(1)} V'),
+            _DetailRow(label: l10n.aux12VLabel,       value: '${auxBatt.toStringAsFixed(1)} V'),
           if (remainingKwh > 0)
-            _DetailRow(label: 'Maradék energia',  value: '${remainingKwh.toStringAsFixed(1)} kWh'),
+            _DetailRow(label: l10n.remainingEnergyLabel, value: '${remainingKwh.toStringAsFixed(1)} kWh'),
           if (toFullKwh > 0)
-            _DetailRow(label: '100%-ig szükséges', value: '${toFullKwh.toStringAsFixed(1)} kWh'),
+            _DetailRow(label: l10n.energyNeededToFullLabel, value: '${toFullKwh.toStringAsFixed(1)} kWh'),
 
-          // ── Hőmérséklet státusz ──────────────────────────────────────
           if (tempMax > 35)
             Padding(
               padding: const EdgeInsets.only(top: 12),
@@ -200,8 +243,8 @@ class ChargingMonitorView extends StatelessWidget {
                     Expanded(
                       child: Text(
                         tempMax > 40
-                            ? 'Magas akkumulátor hőmérséklet: ${tempMax.toStringAsFixed(0)}°C'
-                            : 'Megemelkedett hőmérséklet: ${tempMax.toStringAsFixed(0)}°C',
+                            ? l10n.highBattTempWarning(tempMax)
+                            : l10n.elevatedTempWarning(tempMax),
                         style: TextStyle(
                           color: tempMax > 40 ? Colors.red : Colors.orange,
                           fontSize: 13,
@@ -212,25 +255,34 @@ class ChargingMonitorView extends StatelessWidget {
                 ),
               ),
             ),
+
+          // Elválasztó vonal a részletek és a diagram között
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 16),
+            child: Divider(height: 1),
+          ),
+          // A ChargeChartView a kapott pontokból rajzolja a SOC–kW és
+          // SOC–°C görbéket. Ha még nincs elég adat, helyőrző szöveget mutat.
+          ChargeChartView(points: widget.chargePoints),
+          const SizedBox(height: 8),
         ],
       ),
     );
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// SOC PROGRESS SÁV
-// ═══════════════════════════════════════════════════════════════════════════
-
+/// Töltöttségi sáv százalékos értékkel és opcionális BMS eltérés jelzéssel.
 class _SocBar extends StatelessWidget {
   final double soc;
   final double socBms;
   final Color color;
+  final String label;
 
   const _SocBar({
     required this.soc,
     required this.socBms,
     required this.color,
+    required this.label,
   });
 
   Color _socColor(double v) {
@@ -251,8 +303,8 @@ class _SocBar extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text('Töltöttség (SOC)',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+            Text(label,
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
             Text(
               '${soc > 0 ? soc.toStringAsFixed(1) : '--'}%',
               style: TextStyle(
@@ -286,10 +338,7 @@ class _SocBar extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// BIG CARD
-// ═══════════════════════════════════════════════════════════════════════════
-
+/// Kiemelt értékkártya ikonnal, felirattal és mértékegységgel — a fő töltési mutatókhoz.
 class _BigCard extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -364,10 +413,7 @@ class _BigCard extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// DETAIL ROW
-// ═══════════════════════════════════════════════════════════════════════════
-
+/// Egyszerű felirat–érték pár a töltési részletek listájához.
 class _DetailRow extends StatelessWidget {
   final String label;
   final String value;

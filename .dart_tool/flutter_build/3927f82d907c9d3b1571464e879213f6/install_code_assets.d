@@ -1,0 +1,1 @@
+ C:\\Users\\bende\\StudioProjects\\OBD2\\.dart_tool\\flutter_build\\3927f82d907c9d3b1571464e879213f6\\native_assets.json:  C:\\Users\\bende\\StudioProjects\\OBD2\\.dart_tool\\hooks_runner\\shared\\sqlite3\\build\\download-15a2c940\\libsqlite3.so

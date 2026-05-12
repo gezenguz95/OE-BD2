@@ -1,6 +1,6 @@
 import 'package:drift/drift.dart';
-import '../app_database.dart'; // Needed to extend DatabaseAccessor<AppDatabase>
-import '../tables.dart'; // ✅ Required to bring in Sessions and Readings
+import '../app_database.dart'; // DatabaseAccessor<AppDatabase> kiterjesztéshez
+import '../tables.dart'; // Sessions és Readings tábla-definíciókhoz
 
 part 'session_dao.g.dart';
 

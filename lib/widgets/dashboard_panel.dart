@@ -1,22 +1,21 @@
-// lib/widgets/dashboard_panel.dart
-//
-// MODULE: Dashboard Layout Container
-// PURPOSE:
-// Provides a landscape layout combining the Speedometer and informational cards.
-// Supports Dynamic switching between ICE (Gas) and EV data sets.
+// Fekvő elrendezésű, egyszerűsített műszerfal: nagy sebességmérő + 3 infókártya.
+// ICE és EV adatkészletet is támogat az isEvMode kapcsolóval.
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../services/locale_notifier.dart';
 import 'dashboard_gauge.dart';
 
+/// Fekvő elrendezésű műszerfal panel: bal oldalt a sebességmérő, jobb oldalt mód-specifikus infókártyák.
 class DashboardPanel extends StatelessWidget {
   final Map<String, String> data;
   final bool isEvMode;
 
   const DashboardPanel({
-    Key? key,
+    super.key,
     required this.data,
     this.isEvMode = false,
-  }) : super(key: key);
+  });
 
   double _parseValue(String pid) {
     if (!data.containsKey(pid)) return 0.0;
@@ -33,18 +32,17 @@ class DashboardPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Landscape Layout
     return Container(
-      color: Colors.black, // Dark tech look
+      color: Colors.black,
       padding: const EdgeInsets.all(16.0),
       child: Row(
         children: [
-          // LEFT: Speedometer (Big)
+          // Bal oldal: nagy sebességmérő
           Expanded(
             flex: 6,
             child: Center(
               child: OBDNeedleGauge(
-                title: 'SPEED',
+                title: context.read<LocaleNotifier>().strings.speedGaugeLabel,
                 value: _parseValue('010D'),
                 minValue: 0,
                 maxValue: 240,
@@ -53,15 +51,15 @@ class DashboardPanel extends StatelessWidget {
               ),
             ),
           ),
-          
-          // RIGHT: Info Stack
+
+          // Jobb oldal: mód-specifikus infókártyák
           Expanded(
             flex: 4,
             child: Column(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: isEvMode 
-                ? _buildEvWidgets() 
-                : _buildIceWidgets(),
+              children: isEvMode
+                ? _buildEvWidgets(context)
+                : _buildIceWidgets(context),
             ),
           ),
         ],
@@ -69,22 +67,23 @@ class DashboardPanel extends StatelessWidget {
     );
   }
 
-  List<Widget> _buildIceWidgets() {
+  List<Widget> _buildIceWidgets(BuildContext context) {
+    final l = context.read<LocaleNotifier>().strings;
     return [
       _buildInfoCard(
-        title: 'RPM',
+        title: l.rpmGaugeLabel,
         value: _getText('010C'),
         icon: Icons.speed,
         color: Colors.amber,
       ),
       _buildInfoCard(
-        title: 'ÜZEMANYAG',
+        title: l.dashFuelLabel,
         value: _getText('012F', '%'),
         icon: Icons.local_gas_station,
         color: Colors.blueAccent,
       ),
       _buildInfoCard(
-        title: 'HŐMÉRSÉKLET',
+        title: l.dashTempLabel,
         value: _getText('0105', '°C'),
         icon: Icons.thermostat,
         color: Colors.redAccent,
@@ -92,22 +91,23 @@ class DashboardPanel extends StatelessWidget {
     ];
   }
 
-  List<Widget> _buildEvWidgets() {
+  List<Widget> _buildEvWidgets(BuildContext context) {
+    final l = context.read<LocaleNotifier>().strings;
     return [
       _buildInfoCard(
-        title: 'AKKU',
-        value: _getText('015B', '%'), 
+        title: l.dashBattLabel,
+        value: _getText('015B', '%'),
         icon: Icons.battery_charging_full,
         color: Colors.greenAccent,
       ),
       _buildInfoCard(
-        title: 'FESZÜLTSÉG',
+        title: l.dashVoltageLabel,
         value: _getText('0142', 'V'),
         icon: Icons.electric_bolt,
         color: Colors.yellowAccent,
       ),
       _buildInfoCard(
-        title: 'KÜL. HŐMÉR.',
+        title: l.dashExtTempLabel,
         value: _getText('0146', '°C'),
         icon: Icons.ac_unit,
         color: Colors.cyanAccent,
@@ -126,7 +126,7 @@ class DashboardPanel extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.grey[900],
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.5)),
+        border: Border.all(color: color.withValues(alpha: 0.5)),
       ),
       child: Row(
         children: [

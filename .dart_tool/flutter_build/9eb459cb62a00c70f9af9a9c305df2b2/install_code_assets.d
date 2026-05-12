@@ -1,0 +1,1 @@
+ C:\\Users\\bende\\StudioProjects\\OBD2\\.dart_tool\\flutter_build\\9eb459cb62a00c70f9af9a9c305df2b2\\native_assets.json: 

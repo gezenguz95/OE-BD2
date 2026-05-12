@@ -1,25 +1,15 @@
-// lib/widgets/kitt_dashboard.dart
-//
-// KITT-stílusú digitális műszerfal (Knight Rider ihletésű)
-// – Larson-szkenner animáció
-// – LED-kijelzők (sebesség / teljesítmény / fordulat)
-// – Szegmentált sávgrafikonok
-// – ICE és EV változat
-// – Automatikus álló / fekvő elrendezés
-
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../services/locale_notifier.dart';
 
-// ═══════════════════════════════════════════════════════════════════════════
-// FŐ WIDGET
-// ═══════════════════════════════════════════════════════════════════════════
-
+/// A KITT retro műszerfal belépési pontja: kezeli az animáció életciklusát
+/// és átadja az adatokat az ICE vagy EV elrendezés widgetnek.
 class KittDashboard extends StatefulWidget {
   final Map<String, String> data;
   final bool isEv;
 
-  const KittDashboard({Key? key, required this.data, required this.isEv})
-      : super(key: key);
+  const KittDashboard({super.key, required this.data, required this.isEv});
 
   @override
   State<KittDashboard> createState() => _KittDashboardState();
@@ -44,7 +34,6 @@ class _KittDashboardState extends State<KittDashboard>
     super.dispose();
   }
 
-  // ── Adatelérés ──────────────────────────────────────────────────────────
   double _d(String key) {
     final s = widget.data[key];
     if (s == null || s == '--') return 0;
@@ -56,6 +45,7 @@ class _KittDashboardState extends State<KittDashboard>
     return (v == null || v == '--') ? fallback : v;
   }
 
+  // Értéket normalizál [0.0, 1.0] tartományba a sávgrafikonokhoz.
   double _norm(double v, double min, double max) =>
       max == min ? 0 : ((v - min) / (max - min)).clamp(0.0, 1.0);
 
@@ -64,7 +54,6 @@ class _KittDashboardState extends State<KittDashboard>
     return v <= 0 ? '--' : v.toStringAsFixed(0);
   }
 
-  // ── Build ────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     return OrientationBuilder(
@@ -93,10 +82,7 @@ class _KittDashboardState extends State<KittDashboard>
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// ICE ELRENDEZÉS
-// ═══════════════════════════════════════════════════════════════════════════
-
+/// ICE adatokhoz optimalizált KITT elrendezés: sebesség, fordulat, motor státusz.
 class _IceLayout extends StatelessWidget {
   final Map<String, String> data;
   final double Function(String) d;
@@ -124,38 +110,42 @@ class _IceLayout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = context.read<LocaleNotifier>().strings;
     final bars = [
-      _BarDef('HŰTŐFOLYADÉK °C', norm(d('0105'), 60, 120), _orange),
-      _BarDef('ÜZEMANYAG %', norm(d('012F'), 0, 100), _green),
-      _BarDef('MOTOR TERH. %', norm(d('0104'), 0, 100), _red),
-      _BarDef('SZÍVÓCSŐ HŐM °C', norm(d('010F'), -40, 80), _blue),
+      _BarDef(l.kittCoolantBar,    norm(d('0105'), 60, 120), _orange),
+      _BarDef(l.kittFuelBar,       norm(d('012F'), 0, 100),  _green),
+      _BarDef(l.kittEngineLoadBar, norm(d('0104'), 0, 100),  _red),
+      _BarDef(l.kittIntakeBar,     norm(d('010F'), -40, 80), _blue),
     ];
     final cards = [
-      _CardDef('GÁZPEDÁL', s('0111'), '%', _orange),
-      _CardDef('12V AKKU', s('0142'), 'V', _yellow),
-      _CardDef('SZÍVÓCSŐ', s('010F'), '°C', _blue),
+      _CardDef(l.kittThrottleCard, s('0111'), '%', _orange),
+      _CardDef(l.kittAux12VCard,   s('0142'), 'V', _yellow),
+      _CardDef(l.kittIntakeCard,   s('010F'), '°C', _blue),
     ];
 
+    final speedLbl = l.speedGaugeLabel;
+    final rpmLbl   = l.rpmGaugeLabel;
     return _KittFrame(
       child: landscape
-          ? _iceLandscape(bars, cards)
-          : _icePortrait(bars, cards),
+          ? _iceLandscape(bars, cards, speedLbl, rpmLbl)
+          : _icePortrait(bars, cards, speedLbl, rpmLbl),
     );
   }
 
-  Widget _iceLandscape(List<_BarDef> bars, List<_CardDef> cards) {
+  Widget _iceLandscape(List<_BarDef> bars, List<_CardDef> cards,
+      String speedLabel, String rpmLabel) {
     return Column(children: [
       _LarsonScanner(animation: scanner, color: _red),
       const SizedBox(height: 5),
       Expanded(
         child: Row(children: [
-          // ── Bal: fő kijelzők ──────────────────────────────────
+          // Bal: fő LED-kijelzők (sebesség + fordulat)
           Expanded(
             flex: 5,
             child: Row(children: [
               Expanded(
                 child: _LedDisplay(
-                  label: 'SEBESSÉG',
+                  label: speedLabel,
                   value: s('010D'),
                   unit: 'KM/H',
                   digits: 3,
@@ -164,7 +154,7 @@ class _IceLayout extends StatelessWidget {
               const SizedBox(width: 5),
               Expanded(
                 child: _LedDisplay(
-                  label: 'FORDULATSZÁM',
+                  label: rpmLabel,
                   value: rpmFmt(),
                   unit: 'RPM',
                   digits: 4,
@@ -173,7 +163,7 @@ class _IceLayout extends StatelessWidget {
             ]),
           ),
           const SizedBox(width: 5),
-          // ── Közép: sávgrafikonok ─────────────────────────────
+          // Közép: LED sávgrafikonok (hőmérséklet, üzemanyag, stb.)
           Expanded(
             flex: 4,
             child: _KittPanel(
@@ -187,7 +177,7 @@ class _IceLayout extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 5),
-          // ── Jobb: státuszkártyák ─────────────────────────────
+          // Jobb: kisebb státuszkártyák (gázpedál, akku, stb.)
           Expanded(
             flex: 3,
             child: _KittPanel(
@@ -208,25 +198,26 @@ class _IceLayout extends StatelessWidget {
     ]);
   }
 
-  Widget _icePortrait(List<_BarDef> bars, List<_CardDef> cards) {
+  Widget _icePortrait(List<_BarDef> bars, List<_CardDef> cards,
+      String speedLabel, String rpmLabel) {
     return Column(children: [
       _LarsonScanner(animation: scanner, color: _red),
       const SizedBox(height: 5),
-      // ── Fő kijelzők ───────────────────────────────────────────
+      // Fő LED-kijelzők: sebesség és fordulat
       Expanded(
         flex: 3,
         child: Row(children: [
           Expanded(
-            child: _LedDisplay(label: 'SEBESSÉG', value: s('010D'), unit: 'KM/H', digits: 3),
+            child: _LedDisplay(label: speedLabel, value: s('010D'), unit: 'KM/H', digits: 3),
           ),
           const SizedBox(width: 5),
           Expanded(
-            child: _LedDisplay(label: 'FORDULAT', value: rpmFmt(), unit: 'RPM', digits: 4),
+            child: _LedDisplay(label: rpmLabel, value: rpmFmt(), unit: 'RPM', digits: 4),
           ),
         ]),
       ),
       const SizedBox(height: 5),
-      // ── Sávgrafikonok ─────────────────────────────────────────
+      // LED sávgrafikonok
       Expanded(
         flex: 2,
         child: _KittPanel(
@@ -240,7 +231,7 @@ class _IceLayout extends StatelessWidget {
         ),
       ),
       const SizedBox(height: 5),
-      // ── Státuszkártyák ───────────────────────────────────────
+      // Státuszkártyák
       Expanded(
         flex: 1,
         child: Row(
@@ -256,10 +247,7 @@ class _IceLayout extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// EV ELRENDEZÉS
-// ═══════════════════════════════════════════════════════════════════════════
-
+/// EV adatokhoz optimalizált KITT elrendezés: sebesség, teljesítmény (regen/motor), SOC.
 class _EvLayout extends StatelessWidget {
   final Map<String, String> data;
   final double Function(String) d;
@@ -284,6 +272,7 @@ class _EvLayout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = context.read<LocaleNotifier>().strings;
     final power = d('battery_power');
     final isRegen = power < 0;
     final powerColor = isRegen ? _green : _blue;
@@ -292,26 +281,27 @@ class _EvLayout extends StatelessWidget {
 
     final bars = [
       _BarDef('SOC %', norm(d('soc_display'), 0, 100), _green),
-      _BarDef('TELJESÍTMÉNY kW', norm(power.abs(), 0, 120), powerColor),
-      _BarDef('AKKU HŐFOK °C', norm(d('battery_temp_max'), -10, 50), _orange),
+      _BarDef('${l.powerLabel.toUpperCase()} kW', norm(power.abs(), 0, 120), powerColor),
+      _BarDef('BATT °C', norm(d('battery_temp_max'), -10, 50), _orange),
       _BarDef('SOH %', norm(d('soh'), 70, 100), _blue),
     ];
     final cards = [
       _CardDef('SOC', s('soc_display'), '%', _green),
-      _CardDef('FESZÜLTSÉG', s('battery_voltage'), 'V', _blue),
-      _CardDef('ÁRAM', s('battery_current'), 'A', _yellow),
-      _CardDef('12V AKKU', s('aux_battery_voltage'), 'V', _yellow),
+      _CardDef(l.voltageLabel, s('battery_voltage'), 'V', _blue),
+      _CardDef(l.currentLabel, s('battery_current'), 'A', _yellow),
+      _CardDef(l.kittAux12VCard, s('aux_battery_voltage'), 'V', _yellow),
     ];
 
+    final speedLbl = l.speedGaugeLabel;
     return _KittFrame(
       child: landscape
-          ? _evLandscape(bars, cards, powerLabel, powerVal, powerColor)
-          : _evPortrait(bars, cards, powerLabel, powerVal, powerColor),
+          ? _evLandscape(bars, cards, powerLabel, powerVal, powerColor, speedLbl)
+          : _evPortrait(bars, cards, powerLabel, powerVal, powerColor, speedLbl),
     );
   }
 
   Widget _evLandscape(List<_BarDef> bars, List<_CardDef> cards,
-      String powerLabel, String powerVal, Color powerColor) {
+      String powerLabel, String powerVal, Color powerColor, String speedLabel) {
     return Column(children: [
       _LarsonScanner(animation: scanner, color: _blue),
       const SizedBox(height: 5),
@@ -322,7 +312,7 @@ class _EvLayout extends StatelessWidget {
             child: Row(children: [
               Expanded(
                 child: _LedDisplay(
-                  label: 'SEBESSÉG',
+                  label: speedLabel,
                   value: s('speed'),
                   unit: 'KM/H',
                   digits: 3,
@@ -375,7 +365,7 @@ class _EvLayout extends StatelessWidget {
   }
 
   Widget _evPortrait(List<_BarDef> bars, List<_CardDef> cards,
-      String powerLabel, String powerVal, Color powerColor) {
+      String powerLabel, String powerVal, Color powerColor, String speedLabel) {
     return Column(children: [
       _LarsonScanner(animation: scanner, color: _blue),
       const SizedBox(height: 5),
@@ -384,7 +374,7 @@ class _EvLayout extends StatelessWidget {
         child: Row(children: [
           Expanded(
             child: _LedDisplay(
-              label: 'SEBESSÉG',
+              label: speedLabel,
               value: s('speed'),
               unit: 'KM/H',
               digits: 3,
@@ -432,13 +422,9 @@ class _EvLayout extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// ADATSTRUKTÚRÁK
-// ═══════════════════════════════════════════════════════════════════════════
-
 class _BarDef {
   final String label;
-  final double value; // 0.0–1.0
+  final double value; // normalizált érték 0.0–1.0 között
   final Color color;
   const _BarDef(this.label, this.value, this.color);
 }
@@ -451,10 +437,7 @@ class _CardDef {
   const _CardDef(this.label, this.value, this.unit, this.color);
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// LARSON-SZKENNER
-// ═══════════════════════════════════════════════════════════════════════════
-
+/// Animált pásztázó fénycsík, Knight Rider stílusban. CustomPainter-rel rajzolt.
 class _LarsonScanner extends StatelessWidget {
   final Animation<double> animation;
   final Color color;
@@ -498,19 +481,19 @@ class _ScannerPainter extends CustomPainter {
         const Radius.circular(2),
       );
 
-      // Halványított háttér
+      // Halvány alapsáv — a nem aktív szegmensek is láthatóak maradnak
       canvas.drawRRect(
         rect,
-        Paint()..color = color.withOpacity(0.06),
+        Paint()..color = color.withValues(alpha: 0.06),
       );
 
       if (glow > 0.02) {
-        // Belső fény
+        // Aktív szegmens belső fénye, intenzitás a pozíciótól függ
         canvas.drawRRect(
           rect,
-          Paint()..color = color.withOpacity(0.12 + glow * 0.88),
+          Paint()..color = color.withValues(alpha: 0.12 + glow * 0.88),
         );
-        // Külső glőw (csak a legfényesebb szegmenseknél)
+        // Blur alapú külső glow csak a legfényesebb szegmenseken
         if (glow > 0.4) {
           canvas.drawRRect(
             RRect.fromRectAndRadius(
@@ -518,7 +501,7 @@ class _ScannerPainter extends CustomPainter {
               const Radius.circular(3),
             ),
             Paint()
-              ..color = color.withOpacity(0.18 * glow)
+              ..color = color.withValues(alpha: 0.18 * glow)
               ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5),
           );
         }
@@ -530,10 +513,7 @@ class _ScannerPainter extends CustomPainter {
   bool shouldRepaint(_ScannerPainter o) => o.pos != pos || o.color != color;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// LED KIJELZŐ (nagy szám)
-// ═══════════════════════════════════════════════════════════════════════════
-
+/// Nagy, LED-stílusú számkijelző felirattal és mértékegységgel.
 class _LedDisplay extends StatelessWidget {
   final String label;
   final String value;
@@ -566,7 +546,7 @@ class _LedDisplay extends StatelessWidget {
             Text(
               label,
               style: TextStyle(
-                color: accentColor.withOpacity(0.45),
+                color: accentColor.withValues(alpha: 0.45),
                 fontSize: 8,
                 letterSpacing: 2.5,
                 fontWeight: FontWeight.w600,
@@ -584,8 +564,8 @@ class _LedDisplay extends StatelessWidget {
                     fontWeight: FontWeight.bold,
                     letterSpacing: 6,
                     shadows: [
-                      Shadow(color: accentColor.withOpacity(0.7), blurRadius: 14),
-                      Shadow(color: accentColor.withOpacity(0.35), blurRadius: 28),
+                      Shadow(color: accentColor.withValues(alpha: 0.7), blurRadius: 14),
+                      Shadow(color: accentColor.withValues(alpha: 0.35), blurRadius: 28),
                     ],
                   ),
                 ),
@@ -594,7 +574,7 @@ class _LedDisplay extends StatelessWidget {
             Text(
               unit,
               style: TextStyle(
-                color: accentColor.withOpacity(0.45),
+                color: accentColor.withValues(alpha: 0.45),
                 fontSize: 9,
                 letterSpacing: 3,
               ),
@@ -606,10 +586,8 @@ class _LedDisplay extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// LED SÁVGRAFIKON
-// ═══════════════════════════════════════════════════════════════════════════
-
+/// 20 szegmenses LED-sávgrafikon; a felső 10% pirosba, a 75-90% tartomány
+/// narancsba vált a veszélyzóna vizuális jelzéséhez.
 class _LedBar extends StatelessWidget {
   final _BarDef def;
   const _LedBar(this.def);
@@ -629,7 +607,7 @@ class _LedBar extends StatelessWidget {
               child: Text(
                 def.label,
                 style: TextStyle(
-                  color: def.color.withOpacity(0.55),
+                  color: def.color.withValues(alpha: 0.55),
                   fontSize: 8,
                   letterSpacing: 1.5,
                 ),
@@ -640,7 +618,7 @@ class _LedBar extends StatelessWidget {
             Text(
               '${(def.value * 100).round()}%',
               style: TextStyle(
-                color: def.color.withOpacity(0.7),
+                color: def.color.withValues(alpha: 0.7),
                 fontSize: 8,
               ),
             ),
@@ -652,7 +630,7 @@ class _LedBar extends StatelessWidget {
             final lit = i < active;
             Color col;
             if (!lit) {
-              col = def.color.withOpacity(0.07);
+              col = def.color.withValues(alpha: 0.07);
             } else if (i >= n * 0.9) {
               col = const Color(0xFFFF1100);
             } else if (i >= n * 0.75) {
@@ -673,7 +651,7 @@ class _LedBar extends StatelessWidget {
                   color: col,
                   borderRadius: BorderRadius.circular(1.5),
                   boxShadow: lit
-                      ? [BoxShadow(color: col.withOpacity(0.45), blurRadius: 3)]
+                      ? [BoxShadow(color: col.withValues(alpha: 0.45), blurRadius: 3)]
                       : null,
                 ),
               ),
@@ -685,10 +663,7 @@ class _LedBar extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// STÁTUSZKÁRTYA
-// ═══════════════════════════════════════════════════════════════════════════
-
+/// Kompakt adatkártya felirattal, értékkel és mértékegységgel, LED-glow hatással.
 class _StatusCard extends StatelessWidget {
   final _CardDef def;
   const _StatusCard(this.def);
@@ -699,7 +674,7 @@ class _StatusCard extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       decoration: BoxDecoration(
         color: const Color(0xFF0C0C0C),
-        border: Border.all(color: def.color.withOpacity(0.2)),
+        border: Border.all(color: def.color.withValues(alpha: 0.2)),
         borderRadius: BorderRadius.circular(3),
       ),
       child: Column(
@@ -708,7 +683,7 @@ class _StatusCard extends StatelessWidget {
           Text(
             def.label,
             style: TextStyle(
-              color: def.color.withOpacity(0.45),
+              color: def.color.withValues(alpha: 0.45),
               fontSize: 7.5,
               letterSpacing: 1.5,
             ),
@@ -725,7 +700,7 @@ class _StatusCard extends StatelessWidget {
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
                     shadows: [
-                      Shadow(color: def.color.withOpacity(0.45), blurRadius: 8),
+                      Shadow(color: def.color.withValues(alpha: 0.45), blurRadius: 8),
                     ],
                   ),
                   overflow: TextOverflow.ellipsis,
@@ -734,7 +709,7 @@ class _StatusCard extends StatelessWidget {
               Text(
                 def.unit,
                 style: TextStyle(
-                  color: def.color.withOpacity(0.45),
+                  color: def.color.withValues(alpha: 0.45),
                   fontSize: 9,
                   letterSpacing: 1,
                 ),
@@ -747,24 +722,23 @@ class _StatusCard extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// SEGÉDWIDGETEK
-// ═══════════════════════════════════════════════════════════════════════════
-
+/// A teljes KITT műszerfal külső kerete: fekete háttér, alsó safe area padding.
 class _KittFrame extends StatelessWidget {
   final Widget child;
   const _KittFrame({required this.child});
 
   @override
   Widget build(BuildContext context) {
+    final bottom = MediaQuery.of(context).padding.bottom;
     return Container(
       color: const Color(0xFF050505),
-      padding: const EdgeInsets.fromLTRB(6, 6, 6, 6),
+      padding: EdgeInsets.fromLTRB(6, 6, 6, 6 + bottom),
       child: child,
     );
   }
 }
 
+/// Sötét hátterű, vékony keretes panel — az egyes KITT szekciók keretezéséhez.
 class _KittPanel extends StatelessWidget {
   final Widget child;
   const _KittPanel({required this.child});

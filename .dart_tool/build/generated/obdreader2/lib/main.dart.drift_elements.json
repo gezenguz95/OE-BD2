@@ -1,0 +1,1 @@
+{"valid_import":true,"imports":[{"uri":"package:flutter/material.dart","transitive":false},{"uri":"package:provider/provider.dart","transitive":false},{"uri":"package:obdreader2/data/app_database.dart","transitive":false},{"uri":"package:obdreader2/data/pid_seeds.dart","transitive":false},{"uri":"package:obdreader2/pages/home_page.dart","transitive":false}],"elements":[]}

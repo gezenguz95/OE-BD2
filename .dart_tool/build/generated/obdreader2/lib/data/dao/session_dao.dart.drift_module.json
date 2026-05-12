@@ -1,0 +1,60 @@
+{
+  "elements": {
+    "SessionDao": {
+      "id": {
+        "library_uri": "package:obdreader2/data/dao/session_dao.dart",
+        "name": "SessionDao"
+      },
+      "declaration": {
+        "source_uri": "package:obdreader2/data/dao/session_dao.dart",
+        "offset": 276,
+        "name": "SessionDao"
+      },
+      "references": [
+        {
+          "library_uri": "package:obdreader2/data/tables.dart",
+          "name": "sessions"
+        },
+        {
+          "library_uri": "package:obdreader2/data/tables.dart",
+          "name": "readings"
+        }
+      ],
+      "type": "dao",
+      "tables": [
+        {
+          "library_uri": "package:obdreader2/data/tables.dart",
+          "name": "sessions"
+        },
+        {
+          "library_uri": "package:obdreader2/data/tables.dart",
+          "name": "readings"
+        }
+      ],
+      "views": [],
+      "includes": [],
+      "queries": [],
+      "dart_type": {
+        "elements": [
+          {
+            "lexeme": "SessionDao",
+            "import_uri": "package:obdreader2/data/dao/session_dao.dart"
+          }
+        ]
+      },
+      "database": {
+        "elements": [
+          {
+            "lexeme": "AppDatabase",
+            "import_uri": "package:obdreader2/data/app_database.dart"
+          }
+        ]
+      }
+    }
+  },
+  "imports": [
+    "package:drift/drift.dart",
+    "package:obdreader2/data/app_database.dart",
+    "package:obdreader2/data/tables.dart"
+  ]
+}

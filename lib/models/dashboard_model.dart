@@ -1,5 +1,3 @@
-// lib/models/dashboard_model.dart
-
 import 'package:flutter/material.dart';
 import '../data/app_database.dart';
 

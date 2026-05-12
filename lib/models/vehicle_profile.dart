@@ -1,11 +1,12 @@
-// lib/models/vehicle_profile.dart
+//
+// Járműprofil modellek: EV PID mezők, adatcsoportok, standard PID definíciók és járműprofil.
 
-/// EV mező definíció
+/// Egyetlen EV CAN adatmező definíciója — byte pozíció, skálázás, értéktartomány.
 class EvPidField {
   final String id;
   final String name;
   final String unit;
-  final int startByte;       // adat rész első byte (0-based), -1 = számított
+  final int startByte;       // adatrész első byte-ja (0-tól indexelve); -1 = számított érték
   final int byteCount;       // 1 vagy 2
   final bool signed;
   final double factor;
@@ -13,7 +14,7 @@ class EvPidField {
   final double minValue;
   final double maxValue;
   final bool dashboard;
-  final bool littleEndian;   // true = (byte[start+1]<<8 + byte[start])
+  final bool littleEndian;   // true: (byte[start+1]<<8 + byte[start]) little-endian sorrendben
 
   const EvPidField({
     required this.id,
@@ -31,6 +32,7 @@ class EvPidField {
   });
 }
 
+/// EV CAN adatcsoport: egyetlen OBD parancshoz tartozó mezők gyűjteménye.
 class EvDataGroup {
   final String name;
   final String canHeader;
@@ -42,6 +44,7 @@ class EvDataGroup {
   });
 }
 
+/// Standard OBD-II PID definíció (Mode 01) — kód, név, mértékegység.
 class StdPidDef {
   final String code;
   final String name;
@@ -55,6 +58,7 @@ class StdPidDef {
 
 enum DrivetrainType { ice, hybrid, phev, ev }
 
+/// Járműprofil: azonosítja a jármű típusát, meghatározza az OBD protokollt és az elérhető PID-eket.
 class VehicleProfile {
   final String id;
   final String make;
@@ -66,7 +70,7 @@ class VehicleProfile {
   final List<StdPidDef> stdPids;
   final int obdProtocol;
   final double batteryCapacityKwh;
-  final String evPlatform; // 'hk_legacy', 'egmp', ''
+  final String evPlatform; // EV platform azonosító: 'hk_legacy', 'egmp', vagy üres
 
   const VehicleProfile({
     required this.id, required this.make, required this.model,

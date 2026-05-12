@@ -1,6 +1,4 @@
-// lib/data/app_database.dart
 import 'dart:io';
-import 'dart:math';
 
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
@@ -46,14 +44,14 @@ class AppDatabase extends _$AppDatabase {
         },
       );
 
-  // Catalog CRUD
+  // Katalógus műveletek
   Future<List<PidCatalogData>> getAllPids() => select(pidCatalog).get();
   Future insertCatalog(PidCatalogCompanion p) => into(pidCatalog).insert(p);
 
-  // Values CRUD
+  // Mért értékek beszúrása
   Future insertValue(PidValuesCompanion v) => into(pidValues).insert(v);
 
-  // Stream last N values for a given PID
+  // Egy adott PID-hez az utolsó N érték figyelése (Stream)
   Stream<List<PidValue>> watchValuesForPid(int pidId, {int limit = 50}) {
     return (select(pidValues)
           ..where((tbl) => tbl.pidId.equals(pidId))
@@ -62,12 +60,12 @@ class AppDatabase extends _$AppDatabase {
         .watch();
   }
 
-  /// Completely clear out all stored PID values (e.g. on new session)
+  /// Az összes tárolt PID érték törlése (pl. új munkamenet indításakor).
   Future<int> clearSessionValues() {
     return delete(pidValues).go();
   }
 
-  /// Purge any PID values older than [maxAge]
+  /// A [maxAge]-nél régebbi PID értékek törlése.
   Future<int> purgeValuesOlderThan(Duration maxAge) {
     final cutoff = DateTime.now().subtract(maxAge);
     return (delete(pidValues)
@@ -76,46 +74,11 @@ class AppDatabase extends _$AppDatabase {
   }
 }
 
-/// Opens the SQLite database file lazily.
+/// Az SQLite adatbázis fájl lusta megnyitása (csak első hozzáféréskor).
 LazyDatabase _openConnection() {
   return LazyDatabase(() async {
     final dbFolder = await getApplicationDocumentsDirectory();
     final file = File(p.join(dbFolder.path, 'obdreader.sqlite'));
     return NativeDatabase(file);
   });
-}
-
-/// Extension to generate mock historical data for testing/demo purposes.
-extension MockDataGenerator on AppDatabase {
-  /// Inserts [countPerPid] fake entries for each PID in [pidIds],
-  /// spaced evenly over the last [duration].
-  Future<void> seedMockData({
-    required List<int> pidIds,
-    Duration duration = const Duration(hours: 1),
-    int countPerPid = 50,
-  }) async {
-    final now = DateTime.now();
-    final step = duration.inMilliseconds ~/ countPerPid;
-
-    await batch((b) {
-      for (var pidId in pidIds) {
-        for (var i = 0; i < countPerPid; i++) {
-          final timestamp =
-              now.subtract(Duration(milliseconds: step * (countPerPid - i)));
-          // generate a sine‐wave between 0 and 1, then scale to maybe 0–100
-          final normalized = (sin(2 * pi * i / countPerPid) * 0.5 + 0.5);
-          final value = (normalized * 100);
-
-          b.insert(
-            pidValues,
-            PidValuesCompanion.insert(
-              pidId: pidId,
-              value: value,
-              timeStamp: Value(timestamp),
-            ),
-          );
-        }
-      }
-    });
-  }
 }

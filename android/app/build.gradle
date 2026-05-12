@@ -7,33 +7,53 @@ plugins {
 
 android {
     namespace = "com.example.obdreader2"
-    compileSdk = 35
+    compileSdk = 36
+    ndkVersion = "27.0.12077973"
 
     defaultConfig {
         applicationId = "com.example.obdreader2"
-        minSdk = 21
-        targetSdk = 33
+        minSdk = 24        // Android 7.0 – runtime perms, modern BT API, ~99.5% lefedettség
+        targetSdk = 36
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
 
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_11
-        targetCompatibility JavaVersion.VERSION_11
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+        coreLibraryDesugaringEnabled true
     }
 
     kotlinOptions {
-        jvmTarget = "11"
+        jvmTarget = "17"
     }
 
     buildTypes {
         release {
+            // FONTOS: éles kiadás előtt cseréld le saját release keystore-ra!
+            // Hozz létre key.properties fájlt a kulcs adataival, és töltsd be ide.
             signingConfig = signingConfigs.debug
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'),
+                          'proguard-rules.pro'
         }
     }
 }
 
 
+
+dependencies {
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.5'
+    // Háttérben futó OBD kapcsolat (BluetoothConnectReceiver → ForegroundService)
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1'
+}
+
+// A desugar_jdk_libs eszköz belső Java 8 source/target figyelmeztetésének elnémítása.
+// A JDK 17+ már obsolete-nek jelöli a -source 8 / -target 8 kombinációt.
+tasks.withType(JavaCompile).configureEach {
+    options.compilerArgs.add('-Xlint:-options')
+}
 
 flutter {
     source = "../.."

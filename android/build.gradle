@@ -13,6 +13,31 @@ subprojects {
     project.evaluationDependsOn(":app")
 }
 
+// flutter_blue_plus_android (and similar plugins) use flutter.compileSdkVersion
+// inside their android{} block. That extension is only registered on the :app
+// module by the Flutter Gradle plugin; library subprojects don't have it.
+// Inject a plain-map ext property so those references resolve correctly.
+subprojects {
+    beforeEvaluate {
+        if (name != 'app') {
+            ext.flutter = [
+                compileSdkVersion : 36,
+                minSdkVersion     : 24,
+                targetSdkVersion  : 36,
+                ndkVersion        : '27.0.12077973',
+            ]
+        }
+    }
+}
+
+// Java 8 source/target obsolete figyelmeztetés elnémítása minden modulban
+// (pl. flutter_bluetooth_serial). A JDK 17+ obsolete-nek jelöli a -source 8 / -target 8 kombinációt.
+allprojects {
+    tasks.withType(JavaCompile).configureEach {
+        options.compilerArgs.addAll(['-Xlint:-options', '-Xlint:-deprecation'])
+    }
+}
+
 tasks.register("clean", Delete) {
     delete rootProject.buildDir
 }

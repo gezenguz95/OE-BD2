@@ -1,6 +1,24 @@
-// lib/models/trip_data.dart
+/// GPS koordináta pont — GPS útvonalnaplóhoz.
+class TripLatLng {
+  final double lat;
+  final double lng;
+  const TripLatLng(this.lat, this.lng);
 
-/// Egy időpillanat a valósidős grafikonhoz (in-memory).
+  Map<String, dynamic> toJson() => {'lat': lat, 'lng': lng};
+
+  factory TripLatLng.fromJson(Map<String, dynamic> j) => TripLatLng(
+        (j['lat'] as num).toDouble(),
+        (j['lng'] as num).toDouble(),
+      );
+}
+
+class OBDSample {
+  final DateTime time;
+  final Map<String, double> values;
+
+  const OBDSample({required this.time, required this.values});
+}
+
 class EvDataPoint {
   final DateTime time;
   final double soc;    // %
@@ -15,20 +33,21 @@ class EvDataPoint {
   });
 }
 
-/// Egy rögzített menet teljes rekordja (JSON-ba mentve).
 class TripRecord {
-  final String id;           // millisecondsSinceEpoch string
+  final String id;
   final String vehicleId;
   final String vehicleName;
   final DateTime startedAt;
   final DateTime? endedAt;
-  final double startSoc;     // %
-  final double endSoc;       // %
-  final double energyKwh;    // fogyasztott kWh (maradék kWh különbsége)
+  final double startSoc;
+  final double endSoc;
+  final double energyKwh;
   final double maxSpeedKmh;
   final double avgSpeedKmh;
-  final double whPerKm;      // valódi mért fogyasztás Wh/km (0 = nincs adat)
-  final double distanceKm;   // megtett távolság km-ben (integrált)
+  final double whPerKm;
+  final double distanceKm;
+  /// GPS útvonal — 10 másodpercenként rögzített koordinátapontok listája.
+  final List<TripLatLng> route;
 
   const TripRecord({
     required this.id,
@@ -43,6 +62,7 @@ class TripRecord {
     required this.avgSpeedKmh,
     this.whPerKm = 0,
     this.distanceKm = 0,
+    this.route = const [],
   });
 
   Duration get duration => (endedAt ?? DateTime.now()).difference(startedAt);
@@ -57,6 +77,7 @@ class TripRecord {
     double? avgSpeedKmh,
     double? whPerKm,
     double? distanceKm,
+    List<TripLatLng>? route,
   }) =>
       TripRecord(
         id: id,
@@ -71,6 +92,7 @@ class TripRecord {
         avgSpeedKmh: avgSpeedKmh ?? this.avgSpeedKmh,
         whPerKm: whPerKm ?? this.whPerKm,
         distanceKm: distanceKm ?? this.distanceKm,
+        route: route ?? this.route,
       );
 
   Map<String, dynamic> toJson() => {
@@ -86,6 +108,7 @@ class TripRecord {
         'avgSpeedKmh': avgSpeedKmh,
         'whPerKm': whPerKm,
         'distanceKm': distanceKm,
+        'route': route.map((p) => p.toJson()).toList(),
       };
 
   factory TripRecord.fromJson(Map<String, dynamic> j) => TripRecord(
@@ -103,5 +126,10 @@ class TripRecord {
         avgSpeedKmh: (j['avgSpeedKmh'] as num?)?.toDouble() ?? 0,
         whPerKm: (j['whPerKm'] as num?)?.toDouble() ?? 0,
         distanceKm: (j['distanceKm'] as num?)?.toDouble() ?? 0,
+        // Visszafelé kompatibilis: régebbi JSON-ban nincs 'route' mező → üres lista
+        route: (j['route'] as List<dynamic>?)
+                ?.map((e) => TripLatLng.fromJson(e as Map<String, dynamic>))
+                .toList() ??
+            [],
       );
 }

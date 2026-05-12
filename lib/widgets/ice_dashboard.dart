@@ -1,16 +1,18 @@
-// lib/widgets/ice_dashboard.dart
-//
-// ICE (Belső égésű motor) műszerfal layout.
-// Álló, görgethető nézet műszerekkel, kártyákkal és fedélzeti computerrel.
+// ICE műszerfal — belső égésű motoros járművek OBD adatait megjelenítő nézet.
+// Tartalom: RPM és sebességmérő, hőmérséklet/üzemanyag sávok, motor státusz és fedélzeti computer.
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../l10n/app_localizations.dart';
+import '../services/locale_notifier.dart';
 import 'dashboard_gauge.dart';
 import 'dashboard_cards.dart';
 
+/// Belső égésű motoros járműhöz tartozó műszerfal widget.
 class IceDashboard extends StatelessWidget {
   final Map<String, String> data;
 
-  const IceDashboard({Key? key, required this.data}) : super(key: key);
+  const IceDashboard({super.key, required this.data});
 
   double _v(String pid) => parseObd(data[pid]);
 
@@ -19,21 +21,24 @@ class IceDashboard extends StatelessWidget {
     return (v == null || v == '--') ? '--' : v;
   }
 
+  AppLocalizations _l(BuildContext context) =>
+      context.read<LocaleNotifier>().strings;
+
   @override
   Widget build(BuildContext context) {
+    final l = _l(context);
     return Container(
-      color: const Color(0xFF121212),
+      color: Theme.of(context).scaffoldBackgroundColor,
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(10),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // ── Műszerek: RPM + Sebesség ────────────────
             Row(
               children: [
                 Expanded(
                   child: OBDNeedleGauge(
-                    title: 'FORDULATSZÁM',
+                    title: l.rpmGaugeLabel,
                     value: _v('010C'),
                     minValue: 0,
                     maxValue: 8000,
@@ -60,7 +65,7 @@ class IceDashboard extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: OBDNeedleGauge(
-                    title: 'SEBESSÉG',
+                    title: l.speedGaugeLabel,
                     value: _v('010D'),
                     minValue: 0,
                     maxValue: 240,
@@ -74,12 +79,11 @@ class IceDashboard extends StatelessWidget {
             ),
             const SizedBox(height: 8),
 
-            // ── Hőmérséklet & Üzemanyag ─────────────────
             Row(
               children: [
                 Expanded(
                   child: DashboardBarCard(
-                    label: 'Hűtőfolyadék',
+                    label: l.coolantLabel,
                     value: _v('0105'),
                     min: 60,
                     max: 120,
@@ -92,7 +96,7 @@ class IceDashboard extends StatelessWidget {
                 const SizedBox(width: 6),
                 Expanded(
                   child: DashboardBarCard(
-                    label: 'Szívólevegő',
+                    label: l.intakeAirLabel,
                     value: _v('010F'),
                     min: -40,
                     max: 80,
@@ -105,7 +109,7 @@ class IceDashboard extends StatelessWidget {
                 const SizedBox(width: 6),
                 Expanded(
                   child: DashboardBarCard(
-                    label: 'Üzemanyag',
+                    label: l.fuelLabel,
                     value: _v('012F'),
                     min: 0,
                     max: 100,
@@ -119,12 +123,11 @@ class IceDashboard extends StatelessWidget {
             ),
             const SizedBox(height: 6),
 
-            // ── Motor terhelés & Gázpedál ───────────────
             Row(
               children: [
                 Expanded(
                   child: DashboardValueCard(
-                    label: 'Motor terhelés',
+                    label: l.engineLoadLabel,
                     value: _s('0104'),
                     unit: '%',
                   ),
@@ -132,7 +135,7 @@ class IceDashboard extends StatelessWidget {
                 const SizedBox(width: 6),
                 Expanded(
                   child: DashboardValueCard(
-                    label: 'Gázpedál',
+                    label: l.throttleLabel,
                     value: _s('0111'),
                     unit: '%',
                   ),
@@ -141,12 +144,11 @@ class IceDashboard extends StatelessWidget {
             ),
             const SizedBox(height: 6),
 
-            // ── Akku & Manifold nyomás ──────────────────
             Row(
               children: [
                 Expanded(
                   child: DashboardValueCard(
-                    label: 'Akku (12V)',
+                    label: l.aux12VShort,
                     value: _v('0142') > 0
                         ? fmtVal(_v('0142'), decimals: 1)
                         : '--',
@@ -157,7 +159,7 @@ class IceDashboard extends StatelessWidget {
                 const SizedBox(width: 6),
                 Expanded(
                   child: DashboardBarCard(
-                    label: 'Töltőnyomás',
+                    label: l.boostPressureLabel,
                     value: _v('010B'),
                     min: 0,
                     max: 255,
@@ -171,9 +173,8 @@ class IceDashboard extends StatelessWidget {
             ),
             const SizedBox(height: 6),
 
-            // ── MAF ─────────────────────────────────────
             DashboardBarCard(
-              label: 'Levegő tömegáram (MAF)',
+              label: l.airMassFlowLabel,
               value: _v('0110'),
               min: 0,
               max: 200,
@@ -183,38 +184,20 @@ class IceDashboard extends StatelessWidget {
               maxLabel: '200 g/s',
             ),
 
-            // ── Fedélzeti computer ──────────────────────
-            const DashboardSectionTitle('FEDÉLZETI COMPUTER'),
-            const DCard(
+            DashboardSectionTitle(l.obcLabel),
+            DCard(
               child: Row(
                 children: [
-                  Expanded(
-                      child: TripItem(
-                          label: 'Átlagfogy.',
-                          value: '--',
-                          unit: 'L/100km')),
-                  Expanded(
-                      child: TripItem(
-                          label: 'Pillanatfogy.',
-                          value: '--',
-                          unit: 'L/100km')),
-                  Expanded(
-                      child: TripItem(
-                          label: 'Megtett táv',
-                          value: '--',
-                          unit: 'km')),
-                  Expanded(
-                      child: TripItem(
-                          label: 'Hatótávolság',
-                          value: '--',
-                          unit: 'km')),
+                  Expanded(child: TripItem(label: l.avgConsumptionLabel,     value: '--', unit: 'L/100km')),
+                  Expanded(child: TripItem(label: l.instantConsumptionLabel, value: '--', unit: 'L/100km')),
+                  Expanded(child: TripItem(label: l.distanceTravelledLabel,  value: '--', unit: 'km')),
+                  Expanded(child: TripItem(label: l.rangeLabel,              value: '--', unit: 'km')),
                 ],
               ),
             ),
 
-            // ── Állapotsor ──────────────────────────────
-            const DashboardStatusBar(
-              leftText: 'Nincs aktív hibakód (DTC)',
+            DashboardStatusBar(
+              leftText: l.noDtcLabel,
               rightText: 'PID lekérdezés: --ms',
             ),
           ],

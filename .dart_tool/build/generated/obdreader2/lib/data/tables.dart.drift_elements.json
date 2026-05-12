@@ -1,0 +1,1 @@
+{"valid_import":true,"imports":[{"uri":"package:drift/drift.dart","transitive":false}],"elements":[{"kind":"table","name":"pid_catalog","dart_name":"PidCatalog"},{"kind":"table","name":"pid_values","dart_name":"PidValues"},{"kind":"table","name":"sessions","dart_name":"Sessions"},{"kind":"table","name":"readings","dart_name":"Readings"}]}
